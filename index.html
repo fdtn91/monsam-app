@@ -648,7 +648,7 @@ async function init () {
   await loadInventario()
   await loadClientes()
   await loadCostos()
-  populateModeloSelects()
+  await loadCatalogoCodigos()
   populateColorSelects()
 }
 init()
@@ -1161,10 +1161,18 @@ function renderCostos () {
 // ════════════════════════════════════════════════════════════
 //  SELECTS — poblar con datos reales
 // ════════════════════════════════════════════════════════════
+let catalogoCodigos = []
+
+async function loadCatalogoCodigos () {
+  catalogoCodigos = await api.getCatalogoCodigos(cfg.rutaExcel)
+  populateModeloSelects()
+}
+
 function populateModeloSelects () {
-  const modelos = [...new Set(inventario.map(i => i.modelo)
-    .concat(getCatalogoCodigos()))]
-    .filter(Boolean).sort()
+  const modelos = [...new Set([
+    ...inventario.map(i => i.modelo),
+    ...catalogoCodigos
+  ])].filter(Boolean).sort()
 
   const ids = ['mInvModelo','costoModelo']
   ids.forEach(id => {
@@ -1176,8 +1184,7 @@ function populateModeloSelects () {
 }
 
 function getCatalogoCodigos () {
-  // Intentamos leer los códigos del inventario ya cargado
-  return inventario.map(i => i.modelo)
+  return catalogoCodigos
 }
 
 function populateColorSelects () {

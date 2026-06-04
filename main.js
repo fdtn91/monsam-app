@@ -229,6 +229,22 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
 //  COLORES
 //  Hoja "Colores": Nombre | CodigoColor | Hex | Descripcion | StockGr | CostoPorKg
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  CATÁLOGO — leer códigos de modelos STL desde la hoja principal
+// ════════════════════════════════════════════════════════════
+ipcMain.handle('get-catalogo-codigos', (_, filePath) => {
+  const wb = readWB(filePath)
+  if (!wb) return []
+  const ws   = wb.Sheets[wb.SheetNames[0]]
+  const rows = toRows(ws)
+  const codigos = new Set()
+  for (let i = 1; i < rows.length; i++) {
+    const codigo = String(rows[i][1] || '').trim()
+    if (codigo && codigo !== 'TOTAL DE PARES') codigos.add(codigo)
+  }
+  return [...codigos].sort()
+})
+
 const COL_HDR = ['Nombre', 'CodigoColor', 'Hex', 'Descripcion', 'StockGr', 'CostoPorKg']
 
 ipcMain.handle('get-colores', (_, filePath) => {

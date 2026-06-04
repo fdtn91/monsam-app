@@ -23,9 +23,10 @@ contextBridge.exposeInMainWorld('api', {
   offSyncLog:     ()           => ipcRenderer.removeAllListeners('sync-log'),
 
   // ── Colores ──────────────────────────────────────────────
-  getColores:     (p)          => ipcRenderer.invoke('get-colores',   p),
-  saveColor:      (p, c)       => ipcRenderer.invoke('save-color',    p, c),
-  deleteColor:    (p, nombre)  => ipcRenderer.invoke('delete-color',  p, nombre),
+  getColores:          (p)   => ipcRenderer.invoke('get-colores',          p),
+  saveColor:           (p,c) => ipcRenderer.invoke('save-color',           p, c),
+  deleteColor:         (p,n) => ipcRenderer.invoke('delete-color',         p, n),
+  getCatalogoCodigos:  (p)   => ipcRenderer.invoke('get-catalogo-codigos', p),
 
   // ── Inventario ───────────────────────────────────────────
   getInventario:  (p)          => ipcRenderer.invoke('get-inventario',   p),
