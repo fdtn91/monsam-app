@@ -4,15 +4,12 @@
   "tipoAccesorio": "AR",
   "rutaAretes": "F:\\DISEÑOS\\Modelos 3D\\aretes",
   "rutaExcel": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
-  "rutaGcodes": "F:\\Gcodes",
-  "moonrakerIp": "192.168.68.113:7125",
-  "zOffset": 0.190,
-  "maxModelosPlaca": 7,
-  "orcaSlicerPath": "C:\\Program Files\\OrcaSlicer\\OrcaSlicer.exe",
-  "costoKwh": 2.80,
+  "rutaGcodes": "F:\\DISEÑOS\\Modelos 3D\\aretes\\gcode",
+  "costoKwh": 2.8,
   "wattsPrinter": 350,
-  "costoHerrajes": 3.50,
+  "costoHerrajes": 3.5,
   "porcDesperdicio": 5,
-  "costoEmpaque": 2.00,
-  "version": "1.0.0"
+  "costoEmpaque": 2,
+  "version": "1.0.0",
+  "rutaExcelMonsan": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx"
 }
