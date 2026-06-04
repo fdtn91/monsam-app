@@ -253,10 +253,11 @@ ipcMain.handle('save-color', (_, filePath, color) => {
   const ws   = wb.Sheets['Colores']
   const rows = toRows(ws)
 
-  // Generar código automático si no viene uno
+  // Generar código automático usando el campo colorNombre si viene, si no el nombre completo
   let codigo = color.codigo
   if (!codigo) {
-    const base = color.nombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
+    const fuente = color.colorNombre || color.nombre
+    const base = fuente.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
     const existing = rows.slice(1).map(r => String(r[1] || ''))
     let n = 1
     while (existing.includes(`${base}${n}`)) n++
