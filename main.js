@@ -27,7 +27,8 @@ function createWindow () {
     width: 1200, height: 760,
     minWidth: 960, minHeight: 640,
     frame: false,
-    backgroundColor: '#080B10',
+    show: false,                            // oculta hasta que esté listo
+    backgroundColor: '#F0F2F5',
     icon: path.join(__dirname, 'icono.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -36,6 +37,8 @@ function createWindow () {
     }
   })
   win.loadFile('index.html')
+  // Mostrar sólo cuando el contenido esté pintado — sin flash de fondo negro
+  win.once('ready-to-show', () => win.show())
 }
 
 app.whenReady().then(createWindow)
