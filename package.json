@@ -1,7 +1,7 @@
 {
-  "name": "monsan-app",
+  "name": "monsam-app",
   "version": "1.0.0",
-  "description": "Gestor de modelos 3D, colores, inventario y clientes para MONSAN Accesorios",
+  "description": "Gestor de modelos 3D, colores, inventario y clientes para MONSAM",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
