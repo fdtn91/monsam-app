@@ -1,0 +1,15 @@
+{
+  "name": "monsan-app",
+  "version": "1.0.0",
+  "description": "Gestor de modelos 3D, colores, inventario y clientes para MONSAN Accesorios",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

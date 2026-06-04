@@ -1,0 +1,14 @@
+{
+  "marca": "MONSAN Accesorios",
+  "prefijoSKU": "MON",
+  "tipoAccesorio": "AR",
+  "rutaAretes": "F:\\DISEÑOS\\Modelos 3D\\aretes",
+  "rutaExcel": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
+  "rutaGcodes": "F:\\Gcodes",
+  "costoKwh": 2.80,
+  "wattsPrinter": 350,
+  "costoHerrajes": 3.50,
+  "porcDesperdicio": 5,
+  "costoEmpaque": 2.00,
+  "version": "1.0.0"
+}
