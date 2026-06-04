@@ -7,6 +7,7 @@
     "start": "electron ."
   },
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
