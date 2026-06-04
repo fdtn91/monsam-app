@@ -249,6 +249,95 @@ tr:hover td{ background:var(--s2); }
 .live-dot.on{ background:var(--ok); box-shadow:0 0 6px var(--ok); animation:blink 1s infinite; }
 @keyframes blink{ 0%,100%{opacity:1}50%{opacity:.3} }
 @keyframes fadeIn{ from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+
+/* ── CATÁLOGO GRID ── */
+.catalogo-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));
+  gap:14px;
+}
+.catalogo-card{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; cursor:pointer;
+  transition:border-color .2s, transform .15s;
+}
+.catalogo-card:hover{ border-color:var(--accent); transform:translateY(-2px); }
+.catalogo-card-img{
+  width:100%; aspect-ratio:1;
+  background:var(--s2);
+  display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:hidden;
+}
+.catalogo-card-img canvas{ width:100% !important; height:100% !important; }
+.catalogo-card-img img{ width:100%; height:100%; object-fit:cover; }
+.catalogo-card-info{
+  padding:8px 10px;
+  border-top:1px solid var(--border);
+}
+.catalogo-card-code{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; font-weight:700; color:var(--accent);
+}
+.catalogo-card-folder{
+  font-size:9px; color:var(--muted);
+  margin-top:2px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.catalogo-upload-btn{
+  position:absolute; bottom:6px; right:6px;
+  background:rgba(0,0,0,.6); border:1px solid var(--border);
+  border-radius:5px; padding:3px 7px;
+  font-size:9px; color:var(--text2); cursor:pointer;
+  transition:all .2s; font-family:'Syne',sans-serif; font-weight:700;
+}
+.catalogo-upload-btn:hover{ background:var(--accent); color:#000; border-color:var(--accent); }
+
+/* ── MODAL VIEWER 3D ── */
+.viewer-modal{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:12px; width:700px; max-width:95vw;
+  max-height:90vh; overflow:hidden; display:flex; flex-direction:column;
+}
+.viewer-header{
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+.viewer-title{ font-size:16px; font-weight:800; }
+.viewer-body{ flex:1; display:grid; grid-template-columns:1fr 200px; overflow:hidden; }
+.viewer-canvas-wrap{
+  background:var(--bg); position:relative;
+  min-height:400px; display:flex; align-items:center; justify-content:center;
+}
+.viewer-canvas-wrap canvas{ display:block; }
+.viewer-sidebar{
+  border-left:1px solid var(--border); padding:16px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:12px;
+}
+.viewer-info-row{ font-size:11px; }
+.viewer-info-label{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin-bottom:3px; }
+.viewer-info-val{ font-family:'JetBrains Mono',monospace; color:var(--text); }
+.stl-loading{
+  color:var(--muted); font-family:'JetBrains Mono',monospace;
+  font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;
+}
+.stl-spinner{
+  width:24px; height:24px; border:2px solid var(--border);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg) } }
+
+/* Filtros catálogo */
+.cat-filtros{ display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+.cat-filtro{
+  padding:4px 12px; border-radius:20px; border:1px solid var(--border);
+  background:transparent; color:var(--text2);
+  font-family:'Syne',sans-serif; font-size:10px; font-weight:700;
+  cursor:pointer; transition:all .15s;
+}
+.cat-filtro:hover{ border-color:var(--accent); color:var(--accent); }
+.cat-filtro.active{ background:rgba(240,165,0,.15); border-color:var(--accent); color:var(--accent); }
 </style>
 </head>
 <body>
@@ -276,6 +365,7 @@ tr:hover td{ background:var(--s2); }
       <div class="brand-name">MONSAN<br/>Accesorios</div>
     </div>
     <button class="nav-btn active" onclick="showPage('sync')"       id="nav-sync">      <span class="nav-icon">⟳</span> Sincronizar</button>
+    <button class="nav-btn"        onclick="showPage('catalogo')"   id="nav-catalogo">  <span class="nav-icon">◉</span> Catálogo</button>
     <button class="nav-btn"        onclick="showPage('colores')"    id="nav-colores">   <span class="nav-icon">◈</span> Colores</button>
     <button class="nav-btn"        onclick="showPage('inventario')" id="nav-inventario"><span class="nav-icon">◻</span> Inventario</button>
     <button class="nav-btn"        onclick="showPage('clientes')"   id="nav-clientes">  <span class="nav-icon">◇</span> Clientes</button>
@@ -287,6 +377,32 @@ tr:hover td{ background:var(--s2); }
   </nav>
 
   <div class="content">
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: CATÁLOGO
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-catalogo">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Catálogo de modelos</div>
+          <div class="page-sub">Vista de todos los aretes · foto real o render 3D</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="catBuscar" placeholder="Buscar código..." oninput="filtrarCatalogo()"
+            style="background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                   padding:7px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;
+                   font-size:12px;outline:none;width:180px;"/>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="cat-filtros" id="catFiltros"></div>
+        <div class="catalogo-grid" id="catalogoGrid">
+          <div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;padding:40px">
+            Cargando catálogo...
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════
          PÁGINA: SINCRONIZAR
@@ -624,6 +740,378 @@ tr:hover td{ background:var(--s2); }
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════
+     MODAL: VISOR 3D
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalViewer">
+  <div class="viewer-modal">
+    <div class="viewer-header">
+      <div>
+        <div class="viewer-title" id="viewerTitle">—</div>
+        <div style="font-size:11px;color:var(--text2)" id="viewerFolder">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" id="viewerUploadBtn" onclick="subirFotoViewer()">📷 Subir foto</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('modalViewer')">✕ Cerrar</button>
+      </div>
+    </div>
+    <div class="viewer-body">
+      <div class="viewer-canvas-wrap" id="viewerCanvasWrap">
+        <div class="stl-loading" id="viewerLoading">
+          <div class="stl-spinner"></div>
+          <span>Cargando modelo 3D...</span>
+        </div>
+      </div>
+      <div class="viewer-sidebar">
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Código</div>
+          <div class="viewer-info-val" id="viewerCodigo">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Carpeta</div>
+          <div class="viewer-info-val" id="viewerCarpeta" style="font-size:10px;word-break:break-all">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Archivo STL</div>
+          <div class="viewer-info-val" id="viewerArchivo" style="font-size:10px">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Triángulos</div>
+          <div class="viewer-info-val" id="viewerTris">—</div>
+        </div>
+        <hr style="border-color:var(--border)"/>
+        <div style="font-size:10px;color:var(--muted);line-height:1.6;">
+          🖱️ Arrastra para rotar<br/>
+          🖱️ Rueda para zoom<br/>
+          🖱️ Clic derecho para mover
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Three.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CATÁLOGO
+// ════════════════════════════════════════════════════════════
+let catalogoItems    = []
+let catFiltroActual  = 'Todos'
+let viewerData       = null
+let threeRenderer    = null
+let threeScene       = null
+let threeCamera      = null
+let threeAnimId      = null
+
+async function loadCatalogo () {
+  catalogoItems = await api.getCatalogoCompleto(cfg.rutaExcel)
+  renderCatFiltros()
+  renderCatalogo()
+}
+
+function renderCatFiltros () {
+  // Extraer prefijos únicos (CIR, HEX, FLO, etc.)
+  const prefijos = [...new Set(catalogoItems.map(i => i.codigo.replace(/\d+$/, '')))]
+    .sort()
+  const el = document.getElementById('catFiltros')
+  el.innerHTML = `<button class="cat-filtro active" onclick="setCatFiltro('Todos', this)">Todos (${catalogoItems.length})</button>`
+  prefijos.forEach(p => {
+    const count = catalogoItems.filter(i => i.codigo.startsWith(p)).length
+    el.innerHTML += `<button class="cat-filtro" onclick="setCatFiltro('${p}', this)">${p} (${count})</button>`
+  })
+}
+
+function setCatFiltro (filtro, btn) {
+  catFiltroActual = filtro
+  document.querySelectorAll('.cat-filtro').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  renderCatalogo()
+}
+
+function filtrarCatalogo () {
+  renderCatalogo()
+}
+
+function renderCatalogo () {
+  const buscar = (document.getElementById('catBuscar').value || '').toLowerCase()
+  const grid   = document.getElementById('catalogoGrid')
+
+  let items = catalogoItems
+  if (catFiltroActual !== 'Todos') items = items.filter(i => i.codigo.startsWith(catFiltroActual))
+  if (buscar) items = items.filter(i => i.codigo.toLowerCase().includes(buscar))
+
+  if (!items.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;padding:40px">Sin modelos</div>'
+    return
+  }
+
+  grid.innerHTML = items.map(item => `
+    <div class="catalogo-card" onclick="openViewer('${item.codigo}','${item.carpeta}','${item.archivo1}')">
+      <div class="catalogo-card-img" id="thumb-${item.codigo}">
+        <div class="stl-loading">
+          <div class="stl-spinner"></div>
+        </div>
+        <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>
+      </div>
+      <div class="catalogo-card-info">
+        <div class="catalogo-card-code">${item.codigo}</div>
+        <div class="catalogo-card-folder">${item.carpeta}</div>
+      </div>
+    </div>`).join('')
+
+  // Cargar thumbnails de forma asíncrona
+  items.forEach(item => loadThumb(item))
+}
+
+async function loadThumb (item) {
+  const container = document.getElementById(`thumb-${item.codigo}`)
+  if (!container) return
+
+  // Primero verificar si hay foto real
+  const foto = await api.getFoto(cfg.rutaAretes, item.codigo)
+  if (foto) {
+    container.innerHTML = `
+      <img src="file:///${foto.replace(/\\/g,'/')}" alt="${item.codigo}"/>
+      <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>`
+    return
+  }
+
+  // Si no hay foto, renderizar STL con Three.js
+  const stlB64 = await api.getStlBase64(cfg.rutaAretes, item.carpeta, item.archivo1)
+  if (!stlB64) {
+    container.innerHTML = `
+      <div style="color:var(--muted);font-size:10px;text-align:center;padding:20px">Sin STL</div>
+      <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>`
+    return
+  }
+
+  // Renderizar miniatura con Three.js
+  const canvas = renderSTLThumb(stlB64, 160, 160)
+  container.innerHTML = ''
+  container.appendChild(canvas)
+  const btn = document.createElement('button')
+  btn.className = 'catalogo-upload-btn'
+  btn.textContent = '📷'
+  btn.onclick = (e) => { e.stopPropagation(); subirFotoGrid(item.codigo) }
+  container.appendChild(btn)
+}
+
+function renderSTLThumb (base64, w, h) {
+  const canvas   = document.createElement('canvas')
+  canvas.width   = w
+  canvas.height  = h
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
+  renderer.setSize(w, h)
+  renderer.setPixelRatio(1)
+
+  const scene  = new THREE.Scene()
+  const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 10000)
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8)
+  dirLight.position.set(1, 2, 3)
+  scene.add(dirLight)
+
+  const geometry = parseSTLBase64(base64)
+  const material = new THREE.MeshPhongMaterial({
+    color: 0xF0A500, specular: 0x333333, shininess: 60
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+
+  // Centrar y escalar
+  geometry.computeBoundingBox()
+  const box    = geometry.boundingBox
+  const center = new THREE.Vector3()
+  box.getCenter(center)
+  mesh.position.sub(center)
+
+  const size   = new THREE.Vector3()
+  box.getSize(size)
+  const maxDim = Math.max(size.x, size.y, size.z)
+
+  // Vista frontal — cámara mirando desde el frente (eje Z)
+  camera.position.set(0, 0, maxDim * 1.8)
+  camera.lookAt(0, 0, 0)
+
+  renderer.render(scene, camera)
+  renderer.dispose()
+  geometry.dispose()
+
+  return canvas
+}
+
+function parseSTLBase64 (base64) {
+  const binary  = atob(base64)
+  const buffer  = new ArrayBuffer(binary.length)
+  const view    = new Uint8Array(buffer)
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i)
+
+  const dataView = new DataView(buffer)
+  const numTris  = dataView.getUint32(80, true)
+  const geometry = new THREE.BufferGeometry()
+  const vertices = new Float32Array(numTris * 9)
+  const normals  = new Float32Array(numTris * 9)
+
+  for (let i = 0; i < numTris; i++) {
+    const offset = 84 + i * 50
+    const nx = dataView.getFloat32(offset,      true)
+    const ny = dataView.getFloat32(offset + 4,  true)
+    const nz = dataView.getFloat32(offset + 8,  true)
+    for (let v = 0; v < 3; v++) {
+      const vOff = offset + 12 + v * 12
+      vertices[i * 9 + v * 3]     = dataView.getFloat32(vOff,     true)
+      vertices[i * 9 + v * 3 + 1] = dataView.getFloat32(vOff + 4, true)
+      vertices[i * 9 + v * 3 + 2] = dataView.getFloat32(vOff + 8, true)
+      normals[i * 9 + v * 3]     = nx
+      normals[i * 9 + v * 3 + 1] = ny
+      normals[i * 9 + v * 3 + 2] = nz
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
+  geometry.setAttribute('normal',   new THREE.BufferAttribute(normals,  3))
+  return geometry
+}
+
+// ─── Visor 3D completo (modal) ────────────────────────────
+async function openViewer (codigo, carpeta, archivo1) {
+  viewerData = { codigo, carpeta, archivo1 }
+  document.getElementById('viewerTitle').textContent   = codigo
+  document.getElementById('viewerFolder').textContent  = carpeta
+  document.getElementById('viewerCodigo').textContent  = codigo
+  document.getElementById('viewerCarpeta').textContent = carpeta
+  document.getElementById('viewerArchivo').textContent = archivo1
+  document.getElementById('viewerTris').textContent    = '...'
+  document.getElementById('viewerLoading').style.display = 'flex'
+
+  openModal('modalViewer')
+
+  // Limpiar renderer anterior
+  if (threeRenderer) { threeRenderer.dispose(); threeRenderer = null }
+  if (threeAnimId)   { cancelAnimationFrame(threeAnimId); threeAnimId = null }
+  const wrap = document.getElementById('viewerCanvasWrap')
+  wrap.querySelectorAll('canvas').forEach(c => c.remove())
+
+  // Verificar foto real primero
+  const foto = await api.getFoto(cfg.rutaAretes, codigo)
+  if (foto) {
+    document.getElementById('viewerLoading').style.display = 'none'
+    const img = document.createElement('img')
+    img.src   = `file:///${foto.replace(/\\/g,'/')}`
+    img.style = 'max-width:100%;max-height:100%;object-fit:contain;'
+    wrap.appendChild(img)
+    return
+  }
+
+  // Cargar STL
+  const stlB64 = await api.getStlBase64(cfg.rutaAretes, carpeta, archivo1)
+  if (!stlB64) {
+    document.getElementById('viewerLoading').innerHTML =
+      '<span style="color:var(--error)">STL no encontrado</span>'
+    return
+  }
+
+  document.getElementById('viewerLoading').style.display = 'none'
+
+  const W = wrap.clientWidth  || 460
+  const H = wrap.clientHeight || 400
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer.setSize(W, H)
+  renderer.setPixelRatio(window.devicePixelRatio)
+  wrap.appendChild(renderer.domElement)
+  threeRenderer = renderer
+
+  const scene  = new THREE.Scene()
+  scene.background = new THREE.Color(0x080B10)
+  threeScene = scene
+
+  const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100000)
+  threeCamera  = camera
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+  const d1 = new THREE.DirectionalLight(0xffffff, 0.8)
+  d1.position.set(1, 2, 3); scene.add(d1)
+  const d2 = new THREE.DirectionalLight(0x8888ff, 0.3)
+  d2.position.set(-1, -1, -1); scene.add(d2)
+
+  const geometry = parseSTLBase64(stlB64)
+  const material = new THREE.MeshPhongMaterial({
+    color: 0xF0A500, specular: 0x222222, shininess: 80
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+
+  geometry.computeBoundingBox()
+  const box    = geometry.boundingBox
+  const center = new THREE.Vector3()
+  box.getCenter(center)
+  mesh.position.sub(center)
+
+  const size   = new THREE.Vector3()
+  box.getSize(size)
+  const maxDim = Math.max(size.x, size.y, size.z)
+
+  // Vista frontal
+  camera.position.set(0, 0, maxDim * 2)
+  camera.lookAt(0, 0, 0)
+
+  // Num triángulos
+  const numTris = geometry.attributes.position.count / 3
+  document.getElementById('viewerTris').textContent = numTris.toLocaleString()
+
+  // Orbit controls manual (drag para rotar, wheel para zoom)
+  let isDragging = false, prevX = 0, prevY = 0
+  let rotX = 0, rotY = 0
+
+  renderer.domElement.addEventListener('mousedown', e => {
+    isDragging = true; prevX = e.clientX; prevY = e.clientY
+  })
+  window.addEventListener('mouseup', () => isDragging = false)
+  renderer.domElement.addEventListener('mousemove', e => {
+    if (!isDragging) return
+    rotY += (e.clientX - prevX) * 0.01
+    rotX += (e.clientY - prevY) * 0.01
+    prevX = e.clientX; prevY = e.clientY
+    mesh.rotation.x = rotX
+    mesh.rotation.y = rotY
+  })
+  renderer.domElement.addEventListener('wheel', e => {
+    camera.position.z += e.deltaY * 0.5
+    camera.position.z = Math.max(maxDim * 0.5, Math.min(maxDim * 5, camera.position.z))
+  })
+
+  const animate = () => {
+    threeAnimId = requestAnimationFrame(animate)
+    renderer.render(scene, camera)
+  }
+  animate()
+}
+
+// ─── Subir foto ───────────────────────────────────────────
+async function subirFotoGrid (codigo) {
+  const src = await api.selectFoto(cfg.rutaAretes)
+  if (!src) return
+  const dest = await api.saveFoto(cfg.rutaAretes, codigo, src)
+  if (dest) {
+    // Recargar thumbnail
+    const item = catalogoItems.find(i => i.codigo === codigo)
+    if (item) loadThumb(item)
+  }
+}
+
+async function subirFotoViewer () {
+  if (!viewerData) return
+  await subirFotoGrid(viewerData.codigo)
+  // Reabrir el visor con la foto nueva
+  openViewer(viewerData.codigo, viewerData.carpeta, viewerData.archivo1)
+}
+</script>
+
 <script>
 // ════════════════════════════════════════════════════════════
 //  ESTADO GLOBAL
@@ -649,6 +1137,7 @@ async function init () {
   await loadClientes()
   await loadCostos()
   await loadCatalogoCodigos()
+  await loadCatalogo()
   populateColorSelects()
 }
 init()

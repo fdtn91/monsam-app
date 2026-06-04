@@ -78,6 +78,68 @@ ipcMain.handle('open-excel', async (_, p) => {
 })
 
 // ════════════════════════════════════════════════════════════
+//  CATÁLOGO — fotos y STL
+// ════════════════════════════════════════════════════════════
+
+// Seleccionar foto de imagen
+ipcMain.handle('select-foto', async (_, def) => {
+  const r = await dialog.showOpenDialog({
+    filters: [{ name: 'Imágenes', extensions: ['jpg','jpeg','png','webp'] }],
+    defaultPath: def || ''
+  })
+  return r.canceled ? null : r.filePaths[0]
+})
+
+// Guardar foto — copia el archivo a la carpeta fotos/ junto a los aretes
+ipcMain.handle('save-foto', async (_, rutaAretes, codigo, srcPath) => {
+  try {
+    const fotosDir = path.join(rutaAretes, 'fotos')
+    if (!fs.existsSync(fotosDir)) fs.mkdirSync(fotosDir)
+    const ext    = path.extname(srcPath)
+    const destPath = path.join(fotosDir, `${codigo}${ext}`)
+    fs.copyFileSync(srcPath, destPath)
+    return destPath
+  } catch (e) { return null }
+})
+
+// Obtener ruta de foto si existe
+ipcMain.handle('get-foto', (_, rutaAretes, codigo) => {
+  const fotosDir = path.join(rutaAretes, 'fotos')
+  for (const ext of ['.jpg','.jpeg','.png','.webp']) {
+    const p = path.join(fotosDir, `${codigo}${ext}`)
+    if (fs.existsSync(p)) return p
+  }
+  return null
+})
+
+// Leer archivo STL como base64 para Three.js
+ipcMain.handle('get-stl-base64', (_, rutaAretes, carpeta, archivo) => {
+  try {
+    const stlPath = path.join(rutaAretes, carpeta, archivo)
+    if (!fs.existsSync(stlPath)) return null
+    const buf = fs.readFileSync(stlPath)
+    return buf.toString('base64')
+  } catch { return null }
+})
+
+// Leer catálogo completo con carpeta y archivo STL
+ipcMain.handle('get-catalogo-completo', (_, filePath) => {
+  const wb = readWB(filePath)
+  if (!wb) return []
+  const ws   = wb.Sheets[wb.SheetNames[0]]
+  const rows = toRows(ws)
+  const result = []
+  for (let i = 1; i < rows.length; i++) {
+    const carpeta  = String(rows[i][0] || '').trim()
+    const codigo   = String(rows[i][1] || '').trim()
+    const archivo1 = String(rows[i][2] || '').trim()
+    if (!codigo || codigo === 'TOTAL DE PARES') continue
+    result.push({ carpeta, codigo, archivo1 })
+  }
+  return result
+})
+
+// ════════════════════════════════════════════════════════════
 //  EXCEL — helpers generales
 // ════════════════════════════════════════════════════════════
 function readWB (filePath) {

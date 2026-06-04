@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld('api', {
   selectGcodeDir: (def)        => ipcRenderer.invoke('select-gcode-dir', def),
   openExcel:      (p)          => ipcRenderer.invoke('open-excel',    p),
 
+  // ── Catálogo / Fotos / STL ───────────────────────────────
+  selectFoto:         (def)          => ipcRenderer.invoke('select-foto',           def),
+  saveFoto:           (ra, cod, src) => ipcRenderer.invoke('save-foto',             ra, cod, src),
+  getFoto:            (ra, cod)      => ipcRenderer.invoke('get-foto',              ra, cod),
+  getStlBase64:       (ra, car, arc) => ipcRenderer.invoke('get-stl-base64',        ra, car, arc),
+  getCatalogoCompleto:(p)            => ipcRenderer.invoke('get-catalogo-completo', p),
+
   // ── Configuración ────────────────────────────────────────
   getConfig:      ()           => ipcRenderer.invoke('get-config'),
   saveConfig:     (cfg)        => ipcRenderer.invoke('save-config',   cfg),
