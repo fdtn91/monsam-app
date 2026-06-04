@@ -406,6 +406,22 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   margin-top:2px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis;
 }
+.catalogo-print-btn{
+  display:block; width:100%; margin-top:7px;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:5px; padding:5px 0;
+  font-size:10px; font-weight:700; color:var(--text2);
+  cursor:pointer; transition:all .18s;
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif;
+  text-align:center;
+}
+.catalogo-print-btn:hover{
+  background:var(--accent); color:#fff; border-color:var(--accent);
+}
+.catalogo-print-btn.en-queue{
+  background:rgba(21,81,36,.12); color:var(--accent);
+  border-color:var(--accent); font-weight:700;
+}
 .catalogo-upload-btn{
   position:absolute; bottom:6px; right:6px;
   background:rgba(0,0,0,.6); border:1px solid var(--border);
@@ -584,10 +600,18 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
               Selecciona modelos
               <div style="display:flex;gap:6px;align-items:center;">
-                <span id="printSelCount" style="font-size:10px;color:var(--accent);font-family:'JetBrains Mono',monospace;">0 seleccionados</span>
+                <span id="printSelCount" style="font-size:10px;color:var(--accent);font-family:monospace;">0 seleccionados</span>
                 <button class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">Limpiar</button>
               </div>
             </div>
+            <!-- Buscador -->
+            <input type="text" id="printBuscar" placeholder="Buscar código..."
+              oninput="renderPrintGrid()"
+              style="width:100%;background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                     padding:7px 12px;color:var(--text);font-family:monospace;font-size:12px;
+                     outline:none;margin-bottom:10px;transition:border-color .18s;"
+              onfocus="this.style.borderColor='var(--accent)'"
+              onblur="this.style.borderColor='var(--border)'"/>
             <!-- Filtros rápidos -->
             <div class="cat-filtros" id="printFiltros" style="margin-bottom:12px;"></div>
             <!-- Grid de selección -->
@@ -1204,6 +1228,10 @@ function renderCatalogo () {
       <div class="catalogo-card-info">
         <div class="catalogo-card-code">${item.codigo}</div>
         <div class="catalogo-card-folder">${item.carpeta}</div>
+        <button class="catalogo-print-btn" id="printbtn-${item.codigo}"
+          onclick="event.stopPropagation();togglePrintSelDesdecatalogo('${item.codigo}','${item.carpeta}','${item.archivo1}',this)">
+          🖨 Imprimir
+        </button>
       </div>
     </div>`).join('')
 
@@ -1519,6 +1547,10 @@ function showPage (id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById('page-' + id).classList.add('active')
   document.getElementById('nav-' + id).classList.add('active')
+  // Al volver al catálogo, actualizar el estado visual de los botones de print
+  if (id === 'catalogo') sincronizarBotonesCatalogo()
+  // Al entrar a imprimir, actualizar el buscador y grid
+  if (id === 'imprimir') { refreshPrinterStatus(); renderPrintGrid() }
 }
 
 function showCliTab (tipo) {
@@ -2152,26 +2184,34 @@ function renderPrintGrid () {
       onclick="setPrintFiltro('${p}',this)">${p}</button>`
   })
 
-  const items = printCatFiltro === 'Todos'
+  const buscar = (document.getElementById('printBuscar')?.value || '').toLowerCase()
+
+  let items = printCatFiltro === 'Todos'
     ? catalogoItems
     : catalogoItems.filter(i => i.codigo.startsWith(printCatFiltro))
+
+  if (buscar) items = items.filter(i => i.codigo.toLowerCase().includes(buscar))
 
   const grid = document.getElementById('printGrid')
   grid.innerHTML = items.map(item => {
     const sel = printSeleccion.find(s => s.codigo === item.codigo)
     return `<div onclick="togglePrintSel('${item.codigo}','${item.carpeta}','${item.archivo1}')"
       style="
-        background:${sel ? 'rgba(240,165,0,.15)' : 'var(--s2)'};
+        background:${sel ? 'rgba(21,81,36,.1)' : 'var(--s2)'};
         border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
         border-radius:8px; padding:8px; cursor:pointer; text-align:center;
         transition:all .15s; user-select:none;
       ">
-      ${sel ? `<div style="color:var(--accent);font-size:10px;font-weight:700;margin-bottom:4px;">✓</div>` : ''}
-      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${sel?'var(--accent)':'var(--text)'};">
+      ${sel ? `<div style="color:var(--accent);font-size:10px;font-weight:700;margin-bottom:4px;">✓ En queue</div>` : ''}
+      <div style="font-family:monospace;font-size:11px;font-weight:700;color:${sel?'var(--accent)':'var(--text)'};">
         ${item.codigo}
       </div>
     </div>`
   }).join('')
+
+  if (!items.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:11px;grid-column:1/-1;text-align:center;padding:20px">Sin resultados</div>'
+  }
 }
 
 function setPrintFiltro (filtro, btn) {
@@ -2193,12 +2233,52 @@ function togglePrintSel (codigo, carpeta, archivo1) {
   }
   renderPrintGrid()
   renderPrintQueue()
+  // Sincronizar botón en el catálogo si está visible
+  actualizarBtnCatalogo(codigo)
+}
+
+// Llamado desde el botón "🖨 Imprimir" de cada card del catálogo
+function togglePrintSelDesdecatalogo (codigo, carpeta, archivo1, btn) {
+  const maxModelos = cfg.maxModelosPlaca || 7
+  const idx = printSeleccion.findIndex(s => s.codigo === codigo)
+  if (idx >= 0) {
+    // Ya está en queue — quitar
+    printSeleccion.splice(idx, 1)
+    btn.textContent = '🖨 Imprimir'
+    btn.classList.remove('en-queue')
+  } else {
+    // Agregar al queue
+    if (printSeleccion.length >= maxModelos) {
+      alert(`Máximo ${maxModelos} modelos por placa.\nPuedes cambiar este límite en Configuración.`)
+      return
+    }
+    printSeleccion.push({ codigo, carpeta, archivo1 })
+    btn.textContent = '✓ En queue'
+    btn.classList.add('en-queue')
+  }
+  renderPrintGrid()
+  renderPrintQueue()
+}
+
+// Actualiza el estado visual del botón de catálogo tras cambio desde el print grid
+function actualizarBtnCatalogo (codigo) {
+  const btn = document.getElementById('printbtn-' + codigo)
+  if (!btn) return
+  const enQueue = printSeleccion.some(s => s.codigo === codigo)
+  btn.textContent = enQueue ? '✓ En queue' : '🖨 Imprimir'
+  enQueue ? btn.classList.add('en-queue') : btn.classList.remove('en-queue')
+}
+
+// Resincroniza todos los botones del catálogo con el estado actual del queue
+function sincronizarBotonesCatalogo () {
+  catalogoItems.forEach(item => actualizarBtnCatalogo(item.codigo))
 }
 
 function limpiarSeleccion () {
   printSeleccion = []
   renderPrintGrid()
   renderPrintQueue()
+  sincronizarBotonesCatalogo()
 }
 
 function renderPrintQueue () {
