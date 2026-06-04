@@ -364,8 +364,9 @@ tr:hover td{ background:var(--s2); }
       <div class="brand-label">Gestor</div>
       <div class="brand-name">MONSAN<br/>Accesorios</div>
     </div>
-    <button class="nav-btn active" onclick="showPage('sync')"       id="nav-sync">      <span class="nav-icon">⟳</span> Sincronizar</button>
-    <button class="nav-btn"        onclick="showPage('catalogo')"   id="nav-catalogo">  <span class="nav-icon">◉</span> Catálogo</button>
+    <button class="nav-btn active" onclick="showPage('catalogo')"   id="nav-catalogo">  <span class="nav-icon">◉</span> Catálogo</button>
+    <button class="nav-btn"        onclick="showPage('imprimir')"   id="nav-imprimir">  <span class="nav-icon">🖨</span> Imprimir</button>
+    <button class="nav-btn"        onclick="showPage('sync')"       id="nav-sync">      <span class="nav-icon">⟳</span> Sincronizar</button>
     <button class="nav-btn"        onclick="showPage('colores')"    id="nav-colores">   <span class="nav-icon">◈</span> Colores</button>
     <button class="nav-btn"        onclick="showPage('inventario')" id="nav-inventario"><span class="nav-icon">◻</span> Inventario</button>
     <button class="nav-btn"        onclick="showPage('clientes')"   id="nav-clientes">  <span class="nav-icon">◇</span> Clientes</button>
@@ -381,7 +382,7 @@ tr:hover td{ background:var(--s2); }
     <!-- ══════════════════════════════════════════════════
          PÁGINA: CATÁLOGO
     ══════════════════════════════════════════════════ -->
-    <div class="page" id="page-catalogo">
+    <div class="page active" id="page-catalogo">
       <div class="page-header">
         <div>
           <div class="page-title">Catálogo de modelos</div>
@@ -405,9 +406,106 @@ tr:hover td{ background:var(--s2); }
     </div>
 
     <!-- ══════════════════════════════════════════════════
+         PÁGINA: IMPRIMIR
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-imprimir">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Imprimir</div>
+          <div class="page-sub">Selecciona modelos, configura y lanza la impresión</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="live-dot" id="printerDot"></div>
+            <span id="printerStatusText" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;">Verificando...</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="refreshPrinterStatus()">↻</button>
+        </div>
+      </div>
+      <div class="page-body" style="display:grid;grid-template-columns:1fr 300px;gap:16px;overflow:hidden;">
+
+        <!-- Panel izquierdo: selección de modelos -->
+        <div style="overflow-y:auto;">
+          <div class="card">
+            <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+              Selecciona modelos
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span id="printSelCount" style="font-size:10px;color:var(--accent);font-family:'JetBrains Mono',monospace;">0 seleccionados</span>
+                <button class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">Limpiar</button>
+              </div>
+            </div>
+            <!-- Filtros rápidos -->
+            <div class="cat-filtros" id="printFiltros" style="margin-bottom:12px;"></div>
+            <!-- Grid de selección -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;" id="printGrid">
+              <div style="color:var(--muted);font-size:11px;grid-column:1/-1;text-align:center;padding:20px">Cargando modelos...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel derecho: configuración y acción -->
+        <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+
+          <!-- Estado impresora -->
+          <div class="card" id="printerStatusCard">
+            <div class="card-title">Estado impresora</div>
+            <div id="printerStatusDetail" style="font-size:11px;color:var(--text2);line-height:1.8;font-family:'JetBrains Mono',monospace;">
+              —
+            </div>
+          </div>
+
+          <!-- Configuración de impresión -->
+          <div class="card">
+            <div class="card-title">Configuración</div>
+            <div class="form-grid" style="gap:10px;">
+              <div class="field">
+                <label>Color / Filamento</label>
+                <select id="printColor"><option value="">-- selecciona --</option></select>
+              </div>
+              <div class="field">
+                <label>Pares por modelo</label>
+                <input type="number" id="printPares" value="1" min="1" max="10"/>
+              </div>
+              <div class="field">
+                <label>ZOffset</label>
+                <input type="number" id="printZOffset" step="0.001"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modelos seleccionados -->
+          <div class="card" style="flex:1;">
+            <div class="card-title">Cola de impresión</div>
+            <div id="printQueue" style="font-size:11px;color:var(--muted);min-height:60px;">
+              Ningún modelo seleccionado
+            </div>
+          </div>
+
+          <!-- Botón principal -->
+          <button class="btn btn-primary" id="btnImprimir" onclick="iniciarImpresion()"
+            style="width:100%;height:48px;font-size:13px;letter-spacing:.06em;">
+            🖨 Preparar e imprimir
+          </button>
+
+          <!-- Monitor de impresión en curso -->
+          <div class="card" id="printMonitor" style="display:none;">
+            <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+              <span class="live-dot on"></span>
+              Imprimiendo...
+            </div>
+            <div id="printMonitorDetail" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);line-height:1.8;">—</div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%"
+              onclick="detenerMonitor()">Detener monitoreo</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
          PÁGINA: SINCRONIZAR
     ══════════════════════════════════════════════════ -->
-    <div class="page active" id="page-sync">
+    <div class="page" id="page-sync">
       <div class="page-header">
         <div>
           <div class="page-title">Sincronizar modelos</div>
@@ -638,12 +736,62 @@ tr:hover td{ background:var(--s2); }
             </div>
           </div>
 
+          <!-- ── NUEVA CARD: Impresora ── -->
+          <div class="card">
+            <div class="card-title">Impresora 3D</div>
+            <div class="form-grid form-grid-2">
+              <div class="field" style="grid-column:1/-1">
+                <label>IP Moonraker</label>
+                <input type="text" id="cfgMoonrakerIp" placeholder="192.168.68.113:7125"/>
+              </div>
+              <div class="field">
+                <label>ZOffset (SET_GCODE_OFFSET Z=)</label>
+                <input type="number" id="cfgZOffset" step="0.001" placeholder="0.190"/>
+              </div>
+              <div class="field">
+                <label>Máx. modelos por placa</label>
+                <input type="number" id="cfgMaxModelos" min="1" max="20" placeholder="7"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">OrcaSlicer</div>
+            <div class="path-item" onclick="changeOrcaPath()" id="pOrca">
+              <div class="path-label">🖨 Ejecutable OrcaSlicer</div>
+              <div class="path-val" id="pOrcaVal"></div>
+            </div>
+            <div style="margin-top:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="testMoonraker()">
+                🔌 Probar conexión impresora
+              </button>
+              <span id="moonrakerTestResult" style="margin-left:10px;font-size:11px;font-family:'JetBrains Mono',monospace;"></span>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
 
   </div><!-- /content -->
 </div><!-- /app -->
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: CONFIRMAR INVENTARIO POST-IMPRESIÓN
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalConfirmInv">
+  <div class="modal" style="width:480px">
+    <div class="modal-title">✅ Impresión completada</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">
+      La impresora terminó. ¿Agregar los pares impresos al inventario?
+    </div>
+    <div id="confirmInvDetalle" style="margin-bottom:14px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalConfirmInv')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="confirmarAgregarInventario()">✓ Agregar al inventario</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════
      MODAL: COLOR
@@ -1192,33 +1340,42 @@ function closeModal (id) { document.getElementById(id).classList.remove('open') 
 //  CONFIGURACIÓN
 // ════════════════════════════════════════════════════════════
 function renderConfig () {
-  document.getElementById('cfgMarca').value       = cfg.marca       || ''
-  document.getElementById('cfgPrefijo').value     = cfg.prefijoSKU  || ''
-  document.getElementById('cfgTipo').value        = cfg.tipoAccesorio|| ''
-  document.getElementById('cfgKwh').value         = cfg.costoKwh    || ''
-  document.getElementById('cfgWatts').value       = cfg.wattsPrinter|| ''
-  document.getElementById('cfgHerrajes').value    = cfg.costoHerrajes|| ''
-  document.getElementById('cfgDesperdicio').value = cfg.porcDesperdicio|| ''
-  document.getElementById('cfgEmpaque').value     = cfg.costoEmpaque || ''
+  document.getElementById('cfgMarca').value       = cfg.marca            || ''
+  document.getElementById('cfgPrefijo').value     = cfg.prefijoSKU       || ''
+  document.getElementById('cfgTipo').value        = cfg.tipoAccesorio    || ''
+  document.getElementById('cfgKwh').value         = cfg.costoKwh         || ''
+  document.getElementById('cfgWatts').value       = cfg.wattsPrinter     || ''
+  document.getElementById('cfgHerrajes').value    = cfg.costoHerrajes    || ''
+  document.getElementById('cfgDesperdicio').value = cfg.porcDesperdicio  || ''
+  document.getElementById('cfgEmpaque').value     = cfg.costoEmpaque     || ''
+  // Nuevos campos impresora
+  document.getElementById('cfgMoonrakerIp').value = cfg.moonrakerIp      || '192.168.68.113:7125'
+  document.getElementById('cfgZOffset').value     = cfg.zOffset          !== undefined ? cfg.zOffset : 0.190
+  document.getElementById('cfgMaxModelos').value  = cfg.maxModelosPlaca  || 7
   const setPath = (id, val) => {
     const el = document.getElementById(id)
     el.textContent = val || 'No configurado'
     el.className   = 'path-val' + (val ? ' set' : '')
   }
-  setPath('pAretesVal',  cfg.rutaAretes)
-  setPath('pExcelVal',   cfg.rutaExcel)
-  setPath('pGcodesVal',  cfg.rutaGcodes)
+  setPath('pAretesVal', cfg.rutaAretes)
+  setPath('pExcelVal',  cfg.rutaExcel)
+  setPath('pGcodesVal', cfg.rutaGcodes)
+  setPath('pOrcaVal',   cfg.orcaSlicerPath)
 }
 
 async function saveConfig () {
-  cfg.marca          = document.getElementById('cfgMarca').value
-  cfg.prefijoSKU     = document.getElementById('cfgPrefijo').value.toUpperCase().substring(0,3)
-  cfg.tipoAccesorio  = document.getElementById('cfgTipo').value.toUpperCase()
-  cfg.costoKwh       = parseFloat(document.getElementById('cfgKwh').value)       || 0
-  cfg.wattsPrinter   = parseFloat(document.getElementById('cfgWatts').value)     || 0
-  cfg.costoHerrajes  = parseFloat(document.getElementById('cfgHerrajes').value)  || 0
-  cfg.porcDesperdicio= parseFloat(document.getElementById('cfgDesperdicio').value)|| 0
-  cfg.costoEmpaque   = parseFloat(document.getElementById('cfgEmpaque').value)   || 0
+  cfg.marca            = document.getElementById('cfgMarca').value
+  cfg.prefijoSKU       = document.getElementById('cfgPrefijo').value.toUpperCase().substring(0,3)
+  cfg.tipoAccesorio    = document.getElementById('cfgTipo').value.toUpperCase()
+  cfg.costoKwh         = parseFloat(document.getElementById('cfgKwh').value)         || 0
+  cfg.wattsPrinter     = parseFloat(document.getElementById('cfgWatts').value)       || 0
+  cfg.costoHerrajes    = parseFloat(document.getElementById('cfgHerrajes').value)    || 0
+  cfg.porcDesperdicio  = parseFloat(document.getElementById('cfgDesperdicio').value) || 0
+  cfg.costoEmpaque     = parseFloat(document.getElementById('cfgEmpaque').value)     || 0
+  // Nuevos campos impresora
+  cfg.moonrakerIp      = document.getElementById('cfgMoonrakerIp').value.trim()
+  cfg.zOffset          = parseFloat(document.getElementById('cfgZOffset').value)     || 0.190
+  cfg.maxModelosPlaca  = parseInt(document.getElementById('cfgMaxModelos').value)    || 7
   await api.saveConfig(cfg)
   renderConfig()
   alert('Configuración guardada.')
@@ -1229,6 +1386,26 @@ async function changePath (key) {
   if (key === 'rutaExcel') p = await api.selectExcel(cfg[key])
   else p = await api.selectFolder(cfg[key])
   if (p) { cfg[key] = p; await api.saveConfig(cfg); renderConfig() }
+}
+
+async function changeOrcaPath () {
+  const p = await api.selectOrcaExe(cfg.orcaSlicerPath)
+  if (p) { cfg.orcaSlicerPath = p; await api.saveConfig(cfg); renderConfig() }
+}
+
+async function testMoonraker () {
+  const el = document.getElementById('moonrakerTestResult')
+  el.style.color = 'var(--text2)'
+  el.textContent = 'Probando...'
+  const ip = document.getElementById('cfgMoonrakerIp').value.trim() || cfg.moonrakerIp
+  const res = await api.moonrakerStatus(ip)
+  if (res.ok) {
+    el.style.color = 'var(--ok)'
+    el.textContent = `✓ ${res.state} — ${res.extTemp.toFixed(0)}°C extrusor`
+  } else {
+    el.style.color = 'var(--error)'
+    el.textContent = `✗ Sin conexión: ${res.error || 'timeout'}`
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1714,6 +1891,310 @@ function populateColorSelects () {
 document.getElementById('mInvModelo').addEventListener('change', genSku)
 document.getElementById('mInvColor').addEventListener ('change', genSku)
 document.getElementById('costoColor').addEventListener('change', rellenarCostoKg)
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Estado impresora
+// ════════════════════════════════════════════════════════════
+let printSeleccion   = []   // [{codigo, carpeta, archivo1}]
+let printMonitorId   = null // setInterval
+let printJobData     = null // datos del job en curso para inventario
+let printCatFiltro   = 'Todos'
+
+async function refreshPrinterStatus () {
+  const ip  = cfg.moonrakerIp || '192.168.68.113:7125'
+  const res = await api.moonrakerStatus(ip)
+  const dot = document.getElementById('printerDot')
+  const txt = document.getElementById('printerStatusText')
+  const det = document.getElementById('printerStatusDetail')
+
+  if (res.ok) {
+    const stateColor = res.state === 'ready' ? 'var(--ok)'
+      : res.state === 'printing' ? 'var(--accent)' : 'var(--warn)'
+    dot.style.background   = stateColor
+    dot.style.boxShadow    = `0 0 6px ${stateColor}`
+    txt.textContent        = res.state
+    txt.style.color        = stateColor
+    det.innerHTML = `
+      Estado: <span style="color:var(--text)">${res.state}</span><br/>
+      Extrusor: <span style="color:var(--text)">${res.extTemp.toFixed(1)}°C</span><br/>
+      Cama: <span style="color:var(--text)">${res.bedTemp.toFixed(1)}°C</span>
+      ${res.filename ? `<br/>Archivo: <span style="color:var(--accent)">${res.filename}</span>` : ''}
+    `
+  } else {
+    dot.style.background = 'var(--error)'
+    dot.style.boxShadow  = '0 0 6px var(--error)'
+    txt.textContent      = 'Sin conexión'
+    txt.style.color      = 'var(--error)'
+    det.innerHTML        = `<span style="color:var(--error)">No se puede conectar a la impresora</span>`
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Grid de selección
+// ════════════════════════════════════════════════════════════
+function renderPrintGrid () {
+  // Filtros
+  const prefijos = [...new Set(catalogoItems.map(i => i.codigo.replace(/\d+$/, '')))]
+  const filtros  = document.getElementById('printFiltros')
+  filtros.innerHTML = `<button class="cat-filtro ${printCatFiltro==='Todos'?'active':''}"
+    onclick="setPrintFiltro('Todos',this)">Todos</button>`
+  prefijos.forEach(p => {
+    filtros.innerHTML += `<button class="cat-filtro ${printCatFiltro===p?'active':''}"
+      onclick="setPrintFiltro('${p}',this)">${p}</button>`
+  })
+
+  const items = printCatFiltro === 'Todos'
+    ? catalogoItems
+    : catalogoItems.filter(i => i.codigo.startsWith(printCatFiltro))
+
+  const grid = document.getElementById('printGrid')
+  grid.innerHTML = items.map(item => {
+    const sel = printSeleccion.find(s => s.codigo === item.codigo)
+    return `<div onclick="togglePrintSel('${item.codigo}','${item.carpeta}','${item.archivo1}')"
+      style="
+        background:${sel ? 'rgba(240,165,0,.15)' : 'var(--s2)'};
+        border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+        border-radius:8px; padding:8px; cursor:pointer; text-align:center;
+        transition:all .15s; user-select:none;
+      ">
+      ${sel ? `<div style="color:var(--accent);font-size:10px;font-weight:700;margin-bottom:4px;">✓</div>` : ''}
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${sel?'var(--accent)':'var(--text)'};">
+        ${item.codigo}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function setPrintFiltro (filtro, btn) {
+  printCatFiltro = filtro
+  renderPrintGrid()
+}
+
+function togglePrintSel (codigo, carpeta, archivo1) {
+  const maxModelos = cfg.maxModelosPlaca || 7
+  const idx = printSeleccion.findIndex(s => s.codigo === codigo)
+  if (idx >= 0) {
+    printSeleccion.splice(idx, 1)
+  } else {
+    if (printSeleccion.length >= maxModelos) {
+      alert(`Máximo ${maxModelos} modelos por placa.\nPuedes cambiar este límite en Configuración.`)
+      return
+    }
+    printSeleccion.push({ codigo, carpeta, archivo1 })
+  }
+  renderPrintGrid()
+  renderPrintQueue()
+}
+
+function limpiarSeleccion () {
+  printSeleccion = []
+  renderPrintGrid()
+  renderPrintQueue()
+}
+
+function renderPrintQueue () {
+  const count = document.getElementById('printSelCount')
+  const queue = document.getElementById('printQueue')
+  count.textContent = `${printSeleccion.length} seleccionado${printSeleccion.length !== 1 ? 's' : ''}`
+
+  if (!printSeleccion.length) {
+    queue.innerHTML = '<span style="color:var(--muted)">Ningún modelo seleccionado</span>'
+    return
+  }
+  const pares = parseInt(document.getElementById('printPares').value) || 1
+  queue.innerHTML = printSeleccion.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.codigo}</span>
+      <span style="color:var(--text2)">${pares} par${pares>1?'es':''} × 2 = ${pares*2} piezas</span>
+    </div>`).join('')
+}
+
+// Cuando cambia cantidad de pares actualizar la cola
+document.addEventListener('DOMContentLoaded', () => {
+  const paresInput = document.getElementById('printPares')
+  if (paresInput) paresInput.addEventListener('input', renderPrintQueue)
+})
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Iniciar impresión
+// ════════════════════════════════════════════════════════════
+async function iniciarImpresion () {
+  if (!printSeleccion.length) { alert('Selecciona al menos un modelo.'); return }
+
+  const colorCodigo = document.getElementById('printColor').value
+  if (!colorCodigo) { alert('Selecciona un color/filamento.'); return }
+
+  const colorObj = colores.find(c => c.codigo === colorCodigo)
+  const pares    = parseInt(document.getElementById('printPares').value) || 1
+  const zOffset  = parseFloat(document.getElementById('printZOffset').value) || cfg.zOffset || 0.190
+  const ip       = cfg.moonrakerIp || '192.168.68.113:7125'
+  const orcaPath = cfg.orcaSlicerPath || 'C:\\Program Files\\OrcaSlicer\\OrcaSlicer.exe'
+
+  const btn = document.getElementById('btnImprimir')
+  btn.disabled = true
+  btn.textContent = 'Preparando...'
+
+  try {
+    // ① Mandar ZOffset a Moonraker
+    btn.textContent = '① Enviando ZOffset...'
+    const gcodeRes = await api.moonrakerGcode(ip, `SET_GCODE_OFFSET Z=${zOffset.toFixed(3)}`)
+    if (!gcodeRes.ok) {
+      if (!confirm(`No se pudo enviar el ZOffset: ${gcodeRes.error}\n¿Continuar de todas formas?`)) {
+        btn.disabled = false; btn.textContent = '🖨 Preparar e imprimir'; return
+      }
+    }
+
+    // ② Construir lista de STLs (archivo_1 de cada modelo seleccionado)
+    btn.textContent = '② Abriendo OrcaSlicer...'
+    const stlPaths = []
+    for (const item of printSeleccion) {
+      for (let p = 0; p < pares; p++) {
+        // Agregar ambas piezas del par (_1 y _2)
+        const arch1 = item.archivo1
+        const arch2 = arch1.replace('_1.stl', '_2.stl')
+        stlPaths.push(`${cfg.rutaAretes}\\${item.carpeta}\\${arch1}`)
+        stlPaths.push(`${cfg.rutaAretes}\\${item.carpeta}\\${arch2}`)
+      }
+    }
+
+    const orcaRes = await api.openOrcaSlicer(orcaPath, stlPaths)
+    if (!orcaRes.ok) {
+      alert(`Error al abrir OrcaSlicer: ${orcaRes.error}`)
+      btn.disabled = false; btn.textContent = '🖨 Preparar e imprimir'; return
+    }
+
+    // ③ Guardar datos del job para el inventario
+    printJobData = {
+      modelos:     printSeleccion.map(s => s.codigo),
+      colorCodigo,
+      colorNombre: colorObj ? colorObj.nombre : colorCodigo,
+      pares
+    }
+
+    // ④ Iniciar monitor
+    btn.textContent = '🖨 Preparar e imprimir'
+    btn.disabled    = false
+    iniciarMonitor()
+
+    alert(`OrcaSlicer abierto con ${stlPaths.length} archivos.\n\nHaz Slice y luego Send en OrcaSlicer.\nLa app monitoreará la impresora automáticamente.`)
+
+  } catch (e) {
+    alert('Error: ' + e.message)
+    btn.disabled    = false
+    btn.textContent = '🖨 Preparar e imprimir'
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Monitor de progreso
+// ════════════════════════════════════════════════════════════
+function iniciarMonitor () {
+  const monitor = document.getElementById('printMonitor')
+  monitor.style.display = 'block'
+  if (printMonitorId) clearInterval(printMonitorId)
+
+  let estadoAnterior = ''
+  printMonitorId = setInterval(async () => {
+    const ip  = cfg.moonrakerIp || '192.168.68.113:7125'
+    const res = await api.moonrakerPrintStatus(ip)
+    if (!res.ok) return
+
+    const det = document.getElementById('printMonitorDetail')
+    det.innerHTML = `
+      Estado: <span style="color:var(--text)">${res.state}</span><br/>
+      Archivo: <span style="color:var(--accent)">${res.filename || '—'}</span><br/>
+      Duración: <span style="color:var(--text)">${formatSecs(res.duration)}</span>
+    `
+
+    // También actualizar el dot del header
+    refreshPrinterStatus()
+
+    // Detectar fin de impresión
+    if (res.state === 'complete' && estadoAnterior !== 'complete') {
+      clearInterval(printMonitorId)
+      printMonitorId = null
+      monitor.style.display = 'none'
+      mostrarConfirmacionInventario()
+    }
+    estadoAnterior = res.state
+  }, 10000) // cada 10 segundos
+}
+
+function detenerMonitor () {
+  if (printMonitorId) { clearInterval(printMonitorId); printMonitorId = null }
+  document.getElementById('printMonitor').style.display = 'none'
+}
+
+function formatSecs (secs) {
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = Math.floor(secs % 60)
+  return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Confirmación e inventario
+// ════════════════════════════════════════════════════════════
+function mostrarConfirmacionInventario () {
+  if (!printJobData) return
+  const det = document.getElementById('confirmInvDetalle')
+  det.innerHTML = printJobData.modelos.map(cod => {
+    const sku = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${cod}-${printJobData.colorCodigo}`
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;
+      border-bottom:1px solid var(--border);font-size:12px;">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${sku}</span>
+      <span style="color:var(--text2)">+${printJobData.pares} par${printJobData.pares>1?'es':''}</span>
+    </div>`
+  }).join('')
+  openModal('modalConfirmInv')
+}
+
+async function confirmarAgregarInventario () {
+  if (!printJobData) return
+  const colorObj = colores.find(c => c.codigo === printJobData.colorCodigo)
+
+  for (const codigo of printJobData.modelos) {
+    const sku = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${codigo}-${printJobData.colorCodigo}`
+    const existente = inventario.find(i => i.sku === sku)
+    await api.saveInventario(cfg.rutaExcel, {
+      sku,
+      modelo:          codigo,
+      color:           colorObj ? colorObj.nombre : printJobData.colorCodigo,
+      codigoColor:     printJobData.colorCodigo,
+      pares:           (existente ? existente.pares : 0) + printJobData.pares,
+      costoProduccion: existente ? existente.costoProduccion : 0
+    })
+  }
+
+  closeModal('modalConfirmInv')
+  await loadInventario()
+  printJobData  = null
+  printSeleccion = []
+  renderPrintGrid()
+  renderPrintQueue()
+  alert(`✅ ${printJobData === null ? 'Inventario actualizado correctamente.' : ''}`)
+}
+
+// Inicializar pestaña Imprimir cuando se abre
+const _origShowPage = showPage
+function showPage (id) {
+  _origShowPage(id)
+  if (id === 'imprimir') {
+    // Inicializar color select con los colores disponibles
+    const sel = document.getElementById('printColor')
+    const cur = sel.value
+    sel.innerHTML = '<option value="">-- selecciona color --</option>'
+    colores.forEach(c => sel.innerHTML +=
+      `<option value="${c.codigo}"${c.codigo===cur?' selected':''}>${c.nombre} (${c.codigo})</option>`)
+    // ZOffset por defecto
+    document.getElementById('printZOffset').value = cfg.zOffset || 0.190
+    // Renderizar grid si ya hay modelos
+    if (catalogoItems.length) renderPrintGrid()
+    // Verificar estado impresora
+    refreshPrinterStatus()
+  }
+}
 </script>
 </body>
 </html>

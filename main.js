@@ -617,3 +617,123 @@ ipcMain.handle('save-costo', (_, filePath, item) => {
   wb.Sheets['Costos'] = toSheet(rows)
   return saveWB(wb, filePath)
 })
+
+
+// ════════════════════════════════════════════════════════════
+//  MOONRAKER — integración con impresora Klipper
+// ════════════════════════════════════════════════════════════
+const http = require('http')
+
+function moonrakerRequest (ip, method, endpoint, body) {
+  return new Promise((resolve, reject) => {
+    const data    = body ? JSON.stringify(body) : null
+    const options = {
+      hostname: ip.split(':')[0],
+      port:     parseInt(ip.split(':')[1]) || 7125,
+      path:     endpoint,
+      method,
+      headers:  {
+        'Content-Type':   'application/json',
+        'Content-Length': data ? Buffer.byteLength(data) : 0
+      },
+      timeout: 8000
+    }
+    const req = http.request(options, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)) }
+        catch { resolve({ raw }) }
+      })
+    })
+    req.on('error',   e => reject(e))
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')) })
+    if (data) req.write(data)
+    req.end()
+  })
+}
+
+// Estado de la impresora
+ipcMain.handle('moonraker-status', async (_, ip) => {
+  try {
+    const r = await moonrakerRequest(ip, 'GET',
+      '/printer/objects/query?print_stats&heater_bed&extruder', null)
+    const ps = r?.result?.status?.print_stats || {}
+    const bed = r?.result?.status?.heater_bed || {}
+    const ext = r?.result?.status?.extruder   || {}
+    return {
+      ok:       true,
+      state:    ps.state         || 'unknown',
+      filename: ps.filename      || '',
+      progress: ps.print_duration|| 0,
+      bedTemp:  bed.temperature  || 0,
+      extTemp:  ext.temperature  || 0
+    }
+  } catch (e) {
+    return { ok: false, state: 'offline', error: e.message }
+  }
+})
+
+// Enviar macro GCode (ZOffset etc.)
+ipcMain.handle('moonraker-gcode', async (_, ip, script) => {
+  try {
+    const r = await moonrakerRequest(ip, 'POST',
+      '/printer/gcode/script', { script })
+    return { ok: true, result: r }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// Monitorear progreso de impresión
+ipcMain.handle('moonraker-print-status', async (_, ip) => {
+  try {
+    const r = await moonrakerRequest(ip, 'GET',
+      '/printer/objects/query?print_stats', null)
+    const ps = r?.result?.status?.print_stats || {}
+    return {
+      ok:       true,
+      state:    ps.state         || 'unknown',
+      filename: ps.filename      || '',
+      duration: ps.print_duration|| 0,
+      totalDur: ps.total_duration|| 0
+    }
+  } catch (e) {
+    return { ok: false, state: 'offline', error: e.message }
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+//  ORCASLICER — abrir con STLs seleccionados
+// ════════════════════════════════════════════════════════════
+const { spawn } = require('child_process')
+
+ipcMain.handle('open-orcaslicer', async (_, orcaPath, stlPaths) => {
+  try {
+    if (!fs.existsSync(orcaPath)) {
+      return { ok: false, error: `OrcaSlicer no encontrado en: ${orcaPath}` }
+    }
+    // Verificar que los STLs existen
+    const missing = stlPaths.filter(p => !fs.existsSync(p))
+    if (missing.length > 0) {
+      return { ok: false, error: `STLs no encontrados: ${missing.join(', ')}` }
+    }
+    // Abrir OrcaSlicer con los STLs como argumentos
+    spawn(orcaPath, stlPaths, {
+      detached: true,
+      stdio:    'ignore'
+    }).unref()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// Seleccionar ejecutable de OrcaSlicer
+ipcMain.handle('select-orca-exe', async (_, def) => {
+  const r = await dialog.showOpenDialog({
+    filters:     [{ name: 'Ejecutable', extensions: ['exe'] }],
+    defaultPath: def || 'C:\\Program Files\\OrcaSlicer'
+  })
+  return r.canceled ? null : r.filePaths[0]
+})

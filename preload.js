@@ -52,4 +52,13 @@ contextBridge.exposeInMainWorld('api', {
   calcCosto:      (params)     => ipcRenderer.invoke('calc-costo',    params),
   saveCosto:      (p, item)    => ipcRenderer.invoke('save-costo',    p, item),
   getCostos:      (p)          => ipcRenderer.invoke('get-costos',    p),
+
+  // ── Moonraker / Impresora ────────────────────────────────
+  moonrakerStatus:     (ip)          => ipcRenderer.invoke('moonraker-status',       ip),
+  moonrakerGcode:      (ip, script)  => ipcRenderer.invoke('moonraker-gcode',        ip, script),
+  moonrakerPrintStatus:(ip)          => ipcRenderer.invoke('moonraker-print-status', ip),
+
+  // ── OrcaSlicer ───────────────────────────────────────────
+  openOrcaSlicer:  (orcaPath, stls) => ipcRenderer.invoke('open-orcaslicer',  orcaPath, stls),
+  selectOrcaExe:   (def)            => ipcRenderer.invoke('select-orca-exe',  def),
 })
