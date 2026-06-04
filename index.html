@@ -861,8 +861,22 @@ function renderCatalogo () {
       </div>
     </div>`).join('')
 
-  // Cargar thumbnails de forma asíncrona
-  items.forEach(item => loadThumb(item))
+  // Cargar thumbnails en lotes para no saturar WebGL
+  loadThumbsEnLotes(items)
+}
+
+// Carga los thumbnails de 4 en 4 con pausa entre lotes
+async function loadThumbsEnLotes (items) {
+  const LOTE = 4
+  const PAUSA = 200 // ms entre lotes
+
+  for (let i = 0; i < items.length; i += LOTE) {
+    const lote = items.slice(i, i + LOTE)
+    await Promise.all(lote.map(item => loadThumb(item)))
+    if (i + LOTE < items.length) {
+      await new Promise(r => setTimeout(r, PAUSA))
+    }
+  }
 }
 
 async function loadThumb (item) {
@@ -887,10 +901,10 @@ async function loadThumb (item) {
     return
   }
 
-  // Renderizar miniatura con Three.js
-  const canvas = renderSTLThumb(stlB64, 160, 160)
+  // Renderizar miniatura con Three.js — devuelve imagen estática
+  const imgEl = renderSTLThumb(stlB64, 160, 160)
   container.innerHTML = ''
-  container.appendChild(canvas)
+  container.appendChild(imgEl)
   const btn = document.createElement('button')
   btn.className = 'catalogo-upload-btn'
   btn.textContent = '📷'
@@ -903,7 +917,7 @@ function renderSTLThumb (base64, w, h) {
   canvas.width   = w
   canvas.height  = h
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true })
   renderer.setSize(w, h)
   renderer.setPixelRatio(1)
 
@@ -933,15 +947,24 @@ function renderSTLThumb (base64, w, h) {
   box.getSize(size)
   const maxDim = Math.max(size.x, size.y, size.z)
 
-  // Vista frontal — cámara mirando desde el frente (eje Z)
+  // Vista frontal
   camera.position.set(0, 0, maxDim * 1.8)
   camera.lookAt(0, 0, 0)
 
   renderer.render(scene, camera)
+
+  // Capturar imagen como PNG y liberar el contexto WebGL
+  const imgData = canvas.toDataURL('image/png')
+
   renderer.dispose()
   geometry.dispose()
+  material.dispose()
 
-  return canvas
+  // Devolver imagen estática en lugar de canvas con contexto activo
+  const img   = document.createElement('img')
+  img.src     = imgData
+  img.style   = 'width:100%;height:100%;object-fit:contain;'
+  return img
 }
 
 function parseSTLBase64 (base64) {
