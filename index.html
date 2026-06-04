@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MONSAM</title>
+<style>
+:root {
+  --bg:       #F0F2F5;
+  --s1:       #FFFFFF;
+  --s2:       #F6F8FA;
+  --s3:       #EAEDF1;
+  --border:   #D0D7DE;
+  --accent:   #155124;
+  --accent2:  #1E7A37;
+  --ok:       #1A7F37;
+  --warn:     #9A6700;
+  --error:    #CF222E;
+  --muted:    #8C959F;
+  --text:     #1F2328;
+  --text2:    #57606A;
+  --blue:     #0969DA;
+  --purple:   #8250DF;
+  /* Sidebar colapsa cuando la ventana es angosta */
+  --sidebar-w: 220px;
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html{ font-size:16px; } /* base para rem */
+body{
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif;
+  background:var(--bg); color:var(--text);
+  height:100vh; display:flex; flex-direction:column; overflow:hidden;
+  font-size:1rem; /* 16px base */
+}
+
+/* ── TITLEBAR ── */
+#titlebar{
+  -webkit-app-region:drag;
+  height:44px; background:var(--s1);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px; flex-shrink:0;
+  box-shadow:0 1px 0 var(--border);
+}
+.tb-left{ display:flex; align-items:center; gap:10px; }
+.tb-logo{
+  height:26px; width:auto; object-fit:contain;
+  -webkit-app-region:no-drag; pointer-events:none;
+}
+.tb-title{
+  font-size:13px; font-weight:700; letter-spacing:.14em;
+  color:var(--text); text-transform:uppercase;
+}
+.tb-ver{
+  font-size:11px; color:var(--muted);
+  font-family:monospace;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:4px; padding:1px 6px;
+}
+.win-controls{ -webkit-app-region:no-drag; display:flex; gap:6px; }
+.win-btn{
+  width:13px; height:13px; border-radius:50%; border:none;
+  cursor:pointer; transition:filter .15s, transform .1s;
+}
+.win-btn:hover{ filter:brightness(1.25); transform:scale(1.1); }
+.win-btn.close   { background:#FF5F57; }
+.win-btn.minimize{ background:#FFBD2E; }
+.win-btn.maximize{ background:#28C840; }
+
+/* ── LAYOUT ── */
+.app{ flex:1; display:flex; overflow:hidden; min-height:0; }
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar-w); background:var(--s1);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  padding:16px 10px; gap:2px; flex-shrink:0;
+  overflow-y:auto; overflow-x:hidden;
+}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 8px 16px;
+  border-bottom:1px solid var(--border); margin-bottom:10px; flex-shrink:0;
+}
+.brand-logo{ width:38px; height:38px; object-fit:contain; flex-shrink:0; border-radius:8px; }
+.brand-info{ display:flex; flex-direction:column; min-width:0; }
+.brand-label{ font-size:9px; letter-spacing:.22em; color:var(--accent); font-weight:700; text-transform:uppercase; }
+.brand-name{ font-size:15px; font-weight:700; line-height:1.1; color:var(--text); letter-spacing:.04em; }
+
+.nav-btn{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:8px; border:none;
+  background:transparent; color:var(--text2);
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:600;
+  cursor:pointer; transition:background .18s, color .18s, border-color .18s;
+  text-align:left; width:100%; position:relative; border-left:2px solid transparent; flex-shrink:0;
+}
+.nav-btn:hover{ background:var(--s2); color:var(--text); border-left-color:var(--border); }
+.nav-btn.active{
+  background:linear-gradient(90deg, rgba(21,81,36,.1) 0%, transparent 100%);
+  color:var(--accent); border-left:2px solid var(--accent);
+}
+.nav-icon{ width:18px; height:18px; flex-shrink:0; display:flex; align-items:center; justify-content:center; opacity:.75; }
+.nav-btn.active .nav-icon{ opacity:1; }
+.nav-btn:hover  .nav-icon{ opacity:1; }
+
+.sidebar-footer{
+  margin-top:auto; padding-top:12px;
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0;
+}
+.version-badge{
+  font-family:monospace; font-size:10px; color:var(--muted); text-align:center;
+  background:var(--s2); border:1px solid var(--border); border-radius:4px; padding:2px 8px;
+}
+
+/* ── CONTENT ── */
+.content{ flex:1; overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+
+/* ── PAGES ── */
+.page{ display:none; flex:1; overflow:hidden; flex-direction:column; min-height:0; }
+.page.active{ display:flex; animation:pageIn .2s ease; }
+@keyframes pageIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+
+.page-header{
+  padding:16px 24px 14px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  flex-shrink:0; background:var(--s1);
+}
+.page-title{ font-size:22px; font-weight:700; color:var(--text); }
+.page-sub{ font-size:12px; color:var(--text2); margin-top:2px; }
+.page-body{ flex:1; overflow-y:auto; padding:20px 24px; min-height:0; }
+
+/* ── SCROLLBAR ── */
+.page-body::-webkit-scrollbar{ width:5px; }
+.page-body::-webkit-scrollbar-track{ background:var(--s1); border-radius:3px; }
+.page-body::-webkit-scrollbar-thumb{ background:var(--s3); border-radius:3px; border:1px solid var(--border); }
+.page-body::-webkit-scrollbar-thumb:hover{ background:var(--muted); }
+* { scrollbar-width:thin; scrollbar-color:var(--s3) var(--s1); }
+
+/* ── CARDS ── */
+.card{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:10px; padding:18px; margin-bottom:14px;
+  transition:border-color .2s; box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.card:hover{ border-color:rgba(21,81,36,.3); }
+.card-title{ font-size:11px; font-weight:700; letter-spacing:.15em; color:var(--muted); text-transform:uppercase; margin-bottom:14px; }
+
+/* ── BOTONES ── */
+.btn{
+  border:none; border-radius:7px;
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif;
+  font-weight:700; cursor:pointer; transition:all .18s;
+  display:inline-flex; align-items:center; gap:6px;
+  position:relative; overflow:hidden; white-space:nowrap;
+}
+.btn::after{ content:''; position:absolute; inset:0; opacity:0; background:rgba(255,255,255,.15); border-radius:inherit; transition:opacity .15s; }
+.btn:active::after{ opacity:1; }
+.btn-primary{
+  background:var(--accent); color:#fff;
+  padding:10px 22px; font-size:13px; letter-spacing:.04em;
+}
+.btn-primary:hover{ background:var(--accent2); box-shadow:0 4px 12px rgba(21,81,36,.25); transform:translateY(-1px); }
+.btn-primary:active{ transform:translateY(0); }
+.btn-primary:disabled{ background:var(--s3); color:var(--muted); cursor:not-allowed; box-shadow:none; transform:none; }
+.btn-secondary{ background:var(--s1); color:var(--text2); border:1px solid var(--border); padding:9px 18px; font-size:12px; }
+.btn-secondary:hover{ background:var(--s2); color:var(--text); border-color:var(--accent); }
+.btn-danger{ background:transparent; color:var(--error); border:1px solid rgba(207,34,46,.4); padding:7px 13px; font-size:12px; }
+.btn-danger:hover{ background:var(--error); color:#fff; box-shadow:0 4px 10px rgba(207,34,46,.25); }
+.btn-sm{ padding:5px 11px; font-size:11px; }
+
+/* ── INPUTS ── */
+.form-grid{ display:grid; gap:14px; }
+.form-grid-2{ grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); }
+.form-grid-3{ grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); }
+.field{ display:flex; flex-direction:column; gap:5px; }
+.field label{ font-size:11px; font-weight:700; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+.field input, .field select, .field textarea{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:6px; padding:9px 11px;
+  color:var(--text); font-family:monospace; font-size:13px;
+  outline:none; transition:border-color .18s, box-shadow .18s;
+}
+.field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(21,81,36,.1); }
+.field textarea{ resize:vertical; min-height:64px; }
+.field select option{ background:var(--s1); color:var(--text); }
+
+/* ── TABLAS ── */
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+th{
+  background:var(--s2); color:var(--text2);
+  font-size:10px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; padding:9px 13px; text-align:left;
+  border-bottom:1px solid var(--border);
+}
+td{ padding:9px 13px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); }
+tr{ transition:background .12s; }
+tr:hover td{ background:rgba(21,81,36,.04); }
+.td-mono{ font-family:monospace; }
+.td-sku{ font-family:monospace; color:var(--accent); font-size:12px; font-weight:700; }
+.td-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+
+/* ── BADGES ── */
+.badge{ display:inline-block; padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.badge-ok    { background:rgba(26,127,55,.12);  color:var(--ok); }
+.badge-warn  { background:rgba(154,103,0,.12);  color:var(--warn); }
+.badge-error { background:rgba(207,34,46,.12);  color:var(--error); }
+.badge-blue  { background:rgba(9,105,218,.12);  color:var(--blue); }
+.badge-purple{ background:rgba(130,80,223,.12); color:var(--purple); }
+.badge-accent{ background:rgba(21,81,36,.12);   color:var(--accent); }
+
+/* ── COLOR SWATCH ── */
+.color-swatch{ width:17px; height:17px; border-radius:4px; display:inline-block; border:1px solid var(--border); flex-shrink:0; }
+
+/* ── TABS ── */
+.sub-tabs{ display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.sub-tab{
+  padding:9px 18px; border-radius:6px 6px 0 0; border:none;
+  background:transparent; color:var(--text2);
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .15s; border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.sub-tab:hover{ color:var(--text); }
+.sub-tab.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ── SYNC LOG ── */
+#syncLog{
+  background:var(--s2); border:1px solid var(--border); border-radius:8px;
+  padding:14px; font-family:monospace; font-size:12px;
+  line-height:1.8; height:280px; overflow-y:auto; flex-shrink:0;
+}
+#syncLog::-webkit-scrollbar{ width:4px; }
+#syncLog::-webkit-scrollbar-track{ background:var(--s2); }
+#syncLog::-webkit-scrollbar-thumb{ background:var(--border); border-radius:2px; }
+.log-line{ display:flex; gap:8px; animation:fadeIn .12s ease; }
+.log-prefix{ color:var(--muted); font-size:11px; flex-shrink:0; }
+.log-line.type-ok     .log-msg{ color:var(--ok); }
+.log-line.type-warn   .log-msg{ color:var(--warn); }
+.log-line.type-error  .log-msg{ color:var(--error); }
+.log-line.type-info   .log-msg{ color:var(--text2); }
+.log-line.type-muted  .log-msg{ color:var(--muted); }
+.log-line.type-folder .log-msg{ color:var(--blue); font-weight:600; }
+.log-line.type-item   .log-msg{ color:var(--text); }
+.log-line.type-divider .log-msg{ color:var(--border); }
+.log-empty{ color:var(--muted); display:flex; align-items:center; justify-content:center; height:100%; font-size:13px; }
+
+/* ── STATS BAR ── */
+.stats-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
+.stat-card{
+  background:var(--s1); border:1px solid var(--border); border-radius:10px;
+  padding:16px 14px; display:flex; flex-direction:column; gap:6px;
+  transition:border-color .2s, transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.stat-card:hover{ border-color:rgba(21,81,36,.3); transform:translateY(-1px); }
+.stat-card-top{ display:flex; align-items:center; justify-content:space-between; }
+.stat-icon{ width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.stat-icon svg{ width:16px; height:16px; }
+.stat-num{ font-size:28px; font-weight:800; line-height:1; }
+.stat-num.c-accent{ color:var(--accent); }
+.stat-num.c-ok    { color:var(--ok); }
+.stat-num.c-warn  { color:var(--warn); }
+.stat-num.c-error { color:var(--error); }
+.stat-lbl{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; font-weight:700; }
+.stat-bar{ height:3px; border-radius:2px; background:var(--border); overflow:hidden; margin-top:2px; }
+.stat-bar-fill{ height:100%; border-radius:2px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+
+/* ── MODAL ── */
+.modal-backdrop{
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0); z-index:100;
+  align-items:center; justify-content:center;
+}
+.modal-backdrop.open{ display:flex; background:rgba(0,0,0,.4); animation:backdropIn .2s ease forwards; }
+@keyframes backdropIn{ from{background:rgba(0,0,0,0);} to{background:rgba(0,0,0,.4);} }
+.modal{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:14px; padding:26px; width:540px; max-width:92vw;
+  max-height:88vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);
+  animation:modalIn .22s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes modalIn{ from{opacity:0;transform:scale(.93) translateY(12px);} to{opacity:1;transform:scale(1) translateY(0);} }
+.modal-title{ font-size:17px; font-weight:800; margin-bottom:20px; }
+.modal-footer{ display:flex; gap:8px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap; }
+
+/* ── COSTO BREAKDOWN ── */
+.cost-row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.cost-row:last-child{ border:none; font-weight:700; font-size:15px; color:var(--accent); }
+.cost-label{ color:var(--text2); }
+.cost-val{ font-family:monospace; }
+
+/* ── PATH ITEM ── */
+.path-item{ background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:11px 14px; cursor:pointer; transition:border-color .18s, background .18s; margin-bottom:8px; }
+.path-item:hover{ border-color:var(--accent); background:rgba(21,81,36,.04); }
+.path-label{ font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--accent); text-transform:uppercase; margin-bottom:4px; }
+.path-val{ font-family:monospace; font-size:11px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.path-val.set{ color:var(--ok); }
+
+/* ── LIVE DOT ── */
+.live-dot{ width:7px; height:7px; border-radius:50%; background:var(--muted); display:inline-block; }
+.live-dot.on{ background:var(--ok); box-shadow:0 0 6px var(--ok); animation:blink 1s infinite; }
+@keyframes blink{ 0%,100%{opacity:1}50%{opacity:.3} }
+@keyframes fadeIn{ from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+
+/* ── CATÁLOGO GRID ── */
+.catalogo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:16px; }
+.catalogo-card{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; cursor:pointer;
+  transition:border-color .2s, transform .18s, box-shadow .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.catalogo-card:hover{ border-color:var(--accent); transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.1), 0 0 0 1px rgba(21,81,36,.2); }
+.catalogo-card-img{
+  width:100%; aspect-ratio:1; background:var(--s2);
+  display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:hidden;
+}
+.catalogo-card-img canvas{ width:100% !important; height:100% !important; }
+.catalogo-card-img img{ width:100%; height:100%; object-fit:cover; }
+.catalogo-card-info{ padding:9px 11px 11px; border-top:1px solid var(--border); }
+.catalogo-card-code{ font-family:monospace; font-size:12px; font-weight:700; color:var(--accent); }
+.catalogo-card-folder{ font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.catalogo-print-btn{
+  display:block; width:100%; margin-top:8px;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:5px; padding:6px 0;
+  font-size:11px; font-weight:700; color:var(--text2);
+  cursor:pointer; transition:all .18s;
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif; text-align:center;
+}
+.catalogo-print-btn{
+  display:block; width:100%; margin-top:8px;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:5px; padding:6px 0;
+  font-size:11px; font-weight:700; color:var(--text2);
+  cursor:pointer; transition:all .18s;
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif; text-align:center;
+}
+.catalogo-print-btn:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.catalogo-print-btn.en-queue{ background:rgba(21,81,36,.12); color:var(--accent); border-color:var(--accent); }
+.catalogo-upload-btn{
+  position:absolute; bottom:6px; right:6px;
+  background:rgba(255,255,255,.9); border:1px solid var(--border);
+  border-radius:5px; padding:3px 8px;
+  font-size:10px; color:var(--text2); cursor:pointer;
+  transition:all .2s; font-family:'Gadugi','Segoe UI',system-ui,sans-serif; font-weight:700;
+}
+.catalogo-upload-btn:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* ── MODAL VIEWER 3D ── */
+.viewer-modal{
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:14px; width:740px; max-width:96vw; max-height:92vh;
+  overflow:hidden; display:flex; flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);
+  animation:modalIn .22s cubic-bezier(.34,1.56,.64,1);
+}
+.viewer-header{ padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; flex-wrap:wrap; gap:8px; }
+.viewer-title{ font-size:17px; font-weight:800; }
+.viewer-body{ flex:1; display:grid; grid-template-columns:1fr 210px; overflow:hidden; min-height:0; }
+.viewer-canvas-wrap{ background:var(--s2); position:relative; min-height:360px; display:flex; align-items:center; justify-content:center; }
+.viewer-canvas-wrap canvas{ display:block; }
+.viewer-sidebar{ border-left:1px solid var(--border); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.viewer-info-row{ font-size:12px; }
+.viewer-info-label{ color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin-bottom:3px; }
+.viewer-info-val{ font-family:monospace; color:var(--text); font-size:12px; }
+.stl-loading{ color:var(--muted); font-family:monospace; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.stl-spinner{ width:26px; height:26px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg) } }
+
+/* ── FILTROS ── */
+.cat-filtros{ display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+.cat-filtro{
+  padding:5px 14px; border-radius:20px; border:1px solid var(--border);
+  background:var(--s1); color:var(--text2);
+  font-family:'Gadugi','Segoe UI',system-ui,sans-serif; font-size:11px; font-weight:700;
+  cursor:pointer; transition:all .15s;
+}
+.cat-filtro:hover{ border-color:var(--accent); color:var(--accent); }
+.cat-filtro.active{ background:rgba(21,81,36,.1); border-color:var(--accent); color:var(--accent); }
+
+/* ── RESPONSIVE: sidebar colapsa en ventanas angostas ── */
+@media (max-width: 820px) {
+  :root{ --sidebar-w: 52px; }
+  .brand-info, .sidebar-footer .version-badge{ display:none; }
+  .nav-btn > span:last-child:not(.nav-icon){ display:none; }
+  .brand{ justify-content:center; padding:8px 4px 16px; }
+  .nav-btn{ justify-content:center; padding:10px 6px; }
+  .sidebar{ padding:14px 6px; }
+}
+@media (max-width: 560px) {
+  .page-header{ padding:12px 14px 10px; }
+  .page-body{ padding:14px; }
+  .stats-row{ grid-template-columns:1fr 1fr; }
+  .catalogo-grid{ grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); }
+  .form-grid-2, .form-grid-3{ grid-template-columns:1fr; }
+  .viewer-body{ grid-template-columns:1fr; }
+  .viewer-sidebar{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- TITLEBAR -->
+<div id="titlebar">
+  <div class="tb-left">
+    <img src="monsam1.png" class="tb-logo" alt="MONSAM"/>
+    <span class="tb-title">MONSAM</span>
+    <span class="tb-ver">v1.0.0</span>
+  </div>
+  <div class="win-controls">
+    <button class="win-btn minimize" onclick="api.minimize()"></button>
+    <button class="win-btn maximize" onclick="api.maximize()"></button>
+    <button class="win-btn close"    onclick="api.close()"></button>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="brand">
+      <img src="monsam2.png" class="brand-logo" alt="MONSAM"/>
+      <div class="brand-info">
+        <div class="brand-label">Gestor</div>
+        <div class="brand-name">MONSAM</div>
+      </div>
+    </div>
+
+    <button class="nav-btn active" onclick="showPage('catalogo')"   id="nav-catalogo">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+      Catálogo
+    </button>
+    <button class="nav-btn" onclick="showPage('imprimir')" id="nav-imprimir">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg></span>
+      Imprimir
+    </button>
+    <button class="nav-btn" onclick="showPage('sync')" id="nav-sync">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+      Sincronizar
+    </button>
+    <button class="nav-btn" onclick="showPage('colores')" id="nav-colores">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>
+      Colores
+    </button>
+    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+      Inventario
+    </button>
+    <button class="nav-btn" onclick="showPage('clientes')" id="nav-clientes">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      Clientes
+    </button>
+    <button class="nav-btn" onclick="showPage('costos')" id="nav-costos">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+      Costos
+    </button>
+    <button class="nav-btn" onclick="showPage('config')" id="nav-config">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+      Configuración
+    </button>
+
+    <div class="sidebar-footer">
+      <span class="version-badge">v1.0.0</span>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: CATÁLOGO
+    ══════════════════════════════════════════════════ -->
+    <div class="page active" id="page-catalogo">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Catálogo de modelos</div>
+          <div class="page-sub">Vista de todos los aretes · foto real o render 3D</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="catBuscar" placeholder="Buscar código..." oninput="filtrarCatalogo()"
+            style="background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                   padding:7px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;
+                   font-size:12px;outline:none;width:180px;"/>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="cat-filtros" id="catFiltros"></div>
+        <div class="catalogo-grid" id="catalogoGrid">
+          <div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;padding:40px">
+            Cargando catálogo...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: IMPRIMIR
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-imprimir">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Imprimir</div>
+          <div class="page-sub">Selecciona modelos, configura y lanza la impresión</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="live-dot" id="printerDot"></div>
+            <span id="printerStatusText" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;">Verificando...</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="refreshPrinterStatus()">↻</button>
+        </div>
+      </div>
+      <div class="page-body" style="display:grid;grid-template-columns:1fr 300px;gap:16px;overflow:hidden;">
+
+        <!-- Panel izquierdo: selección de modelos -->
+        <div style="overflow-y:auto;">
+          <div class="card">
+            <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+              Selecciona modelos
+              <div style="display:flex;gap:6px;align-items:center;">
+                <span id="printSelCount" style="font-size:10px;color:var(--accent);font-family:monospace;">0 seleccionados</span>
+                <button class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">Limpiar</button>
+              </div>
+            </div>
+            <!-- Buscador -->
+            <input type="text" id="printBuscar" placeholder="Buscar código..."
+              oninput="renderPrintGrid()"
+              style="width:100%;background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                     padding:7px 12px;color:var(--text);font-family:monospace;font-size:12px;
+                     outline:none;margin-bottom:10px;transition:border-color .18s;"
+              onfocus="this.style.borderColor='var(--accent)'"
+              onblur="this.style.borderColor='var(--border)'"/>
+            <!-- Filtros rápidos -->
+            <div class="cat-filtros" id="printFiltros" style="margin-bottom:12px;"></div>
+            <!-- Grid de selección -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;" id="printGrid">
+              <div style="color:var(--muted);font-size:11px;grid-column:1/-1;text-align:center;padding:20px">Cargando modelos...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel derecho: configuración y acción -->
+        <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+
+          <!-- Estado impresora -->
+          <div class="card" id="printerStatusCard">
+            <div class="card-title">Estado impresora</div>
+            <div id="printerStatusDetail" style="font-size:11px;color:var(--text2);line-height:1.8;font-family:'JetBrains Mono',monospace;">
+              —
+            </div>
+          </div>
+
+          <!-- Configuración de impresión -->
+          <div class="card">
+            <div class="card-title">Configuración</div>
+            <div class="form-grid" style="gap:10px;">
+              <div class="field">
+                <label>Color / Filamento</label>
+                <select id="printColor"><option value="">-- selecciona --</option></select>
+              </div>
+              <div class="field">
+                <label>Pares por modelo</label>
+                <input type="number" id="printPares" value="1" min="1" max="10"/>
+              </div>
+              <div class="field">
+                <label>ZOffset</label>
+                <input type="number" id="printZOffset" step="0.001"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modelos seleccionados -->
+          <div class="card" style="flex:1;">
+            <div class="card-title">Cola de impresión</div>
+            <div id="printQueue" style="font-size:11px;color:var(--muted);min-height:60px;">
+              Ningún modelo seleccionado
+            </div>
+          </div>
+
+          <!-- Botón principal -->
+          <button class="btn btn-primary" id="btnImprimir" onclick="iniciarImpresion()"
+            style="width:100%;height:48px;font-size:13px;letter-spacing:.06em;">
+            🖨 Preparar e imprimir
+          </button>
+
+          <!-- Monitor de impresión en curso -->
+          <div class="card" id="printMonitor" style="display:none;">
+            <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+              <span class="live-dot on"></span>
+              Imprimiendo...
+            </div>
+            <div id="printMonitorDetail" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);line-height:1.8;">—</div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%"
+              onclick="detenerMonitor()">Detener monitoreo</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: SINCRONIZAR
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-sync">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Sincronizar modelos</div>
+          <div class="page-sub">Detecta, renombra y cataloga archivos STL nuevos</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel</button>
+          <button class="btn btn-primary" id="btnSync" onclick="startSync()">⟳ Sincronizar Ahora</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-accent" id="sRen">0</div>
+                <div class="stat-lbl">Renombrados</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(240,165,0,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#F0A500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sRenBar" style="width:0%;background:var(--accent)"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-ok" id="sAgr">0</div>
+                <div class="stat-lbl">En catálogo</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(63,185,80,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#3FB950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sAgrBar" style="width:0%;background:var(--ok)"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-warn" id="sAdv">0</div>
+                <div class="stat-lbl">Advertencias</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(210,153,34,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#D29922" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sAdvBar" style="width:0%;background:var(--warn)"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-error" id="sErr">0</div>
+                <div class="stat-lbl">Errores</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(248,81,73,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#F85149" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sErrBar" style="width:0%;background:var(--error)"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+            <span class="live-dot" id="liveDot"></span>
+            Registro de actividad
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearLog()">Limpiar</button>
+          </div>
+          <div id="syncLog"><div class="log-empty">Presiona Sincronizar Ahora para comenzar</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: COLORES
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-colores">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Colores de filamento</div>
+          <div class="page-sub">Paleta disponible · stock y costos</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModalColor()">+ Nuevo color</button>
+      </div>
+      <div class="page-body">
+        <div class="table-wrap">
+          <table id="tablaColores">
+            <thead><tr>
+              <th>Color</th><th>Nombre</th><th>Código</th>
+              <th>Descripción</th><th>Stock (gr)</th><th>Costo/kg</th><th></th>
+            </tr></thead>
+            <tbody id="bodyColores"><tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: INVENTARIO
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-inventario">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Inventario</div>
+          <div class="page-sub">Stock de pares por SKU</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModalInv()">+ Agregar SKU</button>
+      </div>
+      <div class="page-body">
+        <div class="table-wrap">
+          <table id="tablaInv">
+            <thead><tr>
+              <th>SKU</th><th>Modelo</th><th>Color</th><th>Pares</th><th>Costo Prod.</th><th></th>
+            </tr></thead>
+            <tbody id="bodyInv"><tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: CLIENTES
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-clientes">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Clientes</div>
+          <div class="page-sub">Directos · Distribuidores · Mayoreo</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModalCliente()">+ Nuevo cliente</button>
+      </div>
+      <div class="page-body">
+        <div class="sub-tabs">
+          <button class="sub-tab active" onclick="showCliTab('directo')"      id="ctab-directo">Directos</button>
+          <button class="sub-tab"        onclick="showCliTab('distribuidor')" id="ctab-distribuidor">Distribuidores</button>
+          <button class="sub-tab"        onclick="showCliTab('mayoreo')"      id="ctab-mayoreo">Mayoreo</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Nombre</th><th>Contacto</th><th>RFC</th>
+              <th>Registro</th><th>Últ. compra</th>
+              <th>Últ. piezas</th><th>Acumulado</th><th>SKUs</th><th></th>
+            </tr></thead>
+            <tbody id="bodyClientes"><tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: COSTOS
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-costos">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Costos de producción</div>
+          <div class="page-sub">Calcula el costo por par desde un archivo G-code</div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+          <!-- Panel izquierdo: lector gcode -->
+          <div>
+            <div class="card">
+              <div class="card-title">1 · Cargar G-code</div>
+              <div class="path-item" onclick="loadGcode()" id="gcodePathItem">
+                <div class="path-label">📄 Archivo G-code</div>
+                <div class="path-val" id="gcodePath">Haz clic para seleccionar...</div>
+              </div>
+              <div id="gcodeData" style="display:none;margin-top:10px;">
+                <div class="form-grid form-grid-2">
+                  <div class="field"><label>Peso (gr)</label><input type="number" id="gcPeso" step="0.01"/></div>
+                  <div class="field"><label>Tiempo imp. (hr)</label><input type="number" id="gcHoras" step="0.01"/></div>
+                  <div class="field"><label>Filamento detectado</label><input type="text" id="gcFilamento" readonly/></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">2 · Datos del par</div>
+              <div class="form-grid form-grid-2">
+                <div class="field">
+                  <label>Modelo</label>
+                  <select id="costoModelo"><option value="">-- selecciona --</option></select>
+                </div>
+                <div class="field">
+                  <label>Color</label>
+                  <select id="costoColor"><option value="">-- selecciona --</option></select>
+                </div>
+                <div class="field">
+                  <label>Costo/kg filamento ($)</label>
+                  <input type="number" id="costoCostoKg" step="0.01"/>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%" onclick="calcularCosto()">◆ Calcular costo</button>
+          </div>
+
+          <!-- Panel derecho: resultado y parámetros -->
+          <div>
+            <div class="card" id="costoResultado" style="display:none;">
+              <div class="card-title">Desglose de costo</div>
+              <div id="costoBreakdown"></div>
+              <div style="margin-top:14px;display:flex;gap:8px;">
+                <button class="btn btn-primary" style="flex:1" onclick="guardarCosto()">Guardar y agregar a inventario</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Historial de costos</div>
+              <div class="table-wrap" style="max-height:260px;overflow-y:auto;">
+                <table>
+                  <thead><tr><th>SKU</th><th>Costo Total</th><th>Fecha</th></tr></thead>
+                  <tbody id="bodyCostos"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px">Sin registros</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: CONFIGURACIÓN
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-config">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Configuración</div>
+          <div class="page-sub">Parámetros globales de la app</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()">Guardar cambios</button>
+      </div>
+      <div class="page-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:900px;">
+
+          <div class="card">
+            <div class="card-title">Empresa</div>
+            <div class="form-grid">
+              <div class="field"><label>Nombre de marca</label><input type="text" id="cfgMarca"/></div>
+              <div class="field"><label>Prefijo SKU (3 letras)</label><input type="text" id="cfgPrefijo" maxlength="3"/></div>
+              <div class="field"><label>Tipo de accesorio</label><input type="text" id="cfgTipo" maxlength="4"/></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Costos de producción</div>
+            <div class="form-grid form-grid-2">
+              <div class="field"><label>Costo kWh ($)</label><input type="number" id="cfgKwh" step="0.01"/></div>
+              <div class="field"><label>Watts impresora</label><input type="number" id="cfgWatts"/></div>
+              <div class="field"><label>Costo herrajes/par ($)</label><input type="number" id="cfgHerrajes" step="0.01"/></div>
+              <div class="field"><label>% Desperdicio/fallas</label><input type="number" id="cfgDesperdicio" step="0.1"/></div>
+              <div class="field"><label>Costo empaque/par ($)</label><input type="number" id="cfgEmpaque" step="0.01"/></div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column:1/-1;">
+            <div class="card-title">Rutas de archivos</div>
+            <div class="path-item" onclick="changePath('rutaAretes')" id="pAretes">
+              <div class="path-label">📁 Carpeta de aretes (STLs)</div>
+              <div class="path-val" id="pAretesVal"></div>
+            </div>
+            <div class="path-item" onclick="changePath('rutaExcel')" id="pExcel">
+              <div class="path-label">📊 Archivo Excel</div>
+              <div class="path-val" id="pExcelVal"></div>
+            </div>
+            <div class="path-item" onclick="changePath('rutaGcodes')" id="pGcodes">
+              <div class="path-label">📄 Carpeta de G-codes</div>
+              <div class="path-val" id="pGcodesVal"></div>
+            </div>
+          </div>
+
+          <!-- ── NUEVA CARD: Impresora ── -->
+          <div class="card">
+            <div class="card-title">Impresora 3D</div>
+            <div class="form-grid form-grid-2">
+              <div class="field" style="grid-column:1/-1">
+                <label>IP Moonraker</label>
+                <input type="text" id="cfgMoonrakerIp" placeholder="192.168.68.113:7125"/>
+              </div>
+              <div class="field">
+                <label>ZOffset (SET_GCODE_OFFSET Z=)</label>
+                <input type="number" id="cfgZOffset" step="0.001" placeholder="0.190"/>
+              </div>
+              <div class="field">
+                <label>Máx. modelos por placa</label>
+                <input type="number" id="cfgMaxModelos" min="1" max="20" placeholder="7"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">OrcaSlicer</div>
+            <div class="path-item" onclick="changeOrcaPath()" id="pOrca">
+              <div class="path-label">🖨 Ejecutable OrcaSlicer</div>
+              <div class="path-val" id="pOrcaVal"></div>
+            </div>
+            <div style="margin-top:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="testMoonraker()">
+                🔌 Probar conexión impresora
+              </button>
+              <span id="moonrakerTestResult" style="margin-left:10px;font-size:11px;font-family:'JetBrains Mono',monospace;"></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: CONFIRMAR INVENTARIO POST-IMPRESIÓN
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalConfirmInv">
+  <div class="modal" style="width:480px">
+    <div class="modal-title">✅ Impresión completada</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">
+      La impresora terminó. ¿Agregar los pares impresos al inventario?
+    </div>
+    <div id="confirmInvDetalle" style="margin-bottom:14px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalConfirmInv')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="confirmarAgregarInventario()">✓ Agregar al inventario</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: COLOR
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalColor">
+  <div class="modal">
+    <div class="modal-title" id="modalColorTitle">Nuevo color</div>
+    <div class="form-grid form-grid-2">
+      <div class="field" style="grid-column:1/-1"><label>Nombre del color</label><input type="text" id="mColorNombre" placeholder="Rojo Carmín"/></div>
+      <div class="field"><label>Color (hex)</label><input type="color" id="mColorHex" value="#F0A500" style="height:38px;padding:2px 6px;"/></div>
+      <div class="field"><label>Código (auto si vacío)</label><input type="text" id="mColorCodigo" placeholder="ROJ1" maxlength="5"/></div>
+      <div class="field" style="grid-column:1/-1"><label>Descripción</label><input type="text" id="mColorDesc" placeholder="PLA rojo oscuro"/></div>
+      <div class="field"><label>Stock (gr)</label><input type="number" id="mColorStock" value="0"/></div>
+      <div class="field"><label>Costo por kg ($)</label><input type="number" id="mColorCosto" step="0.01" value="0"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalColor')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="saveColor()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: INVENTARIO
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalInv">
+  <div class="modal">
+    <div class="modal-title">Agregar / editar SKU</div>
+    <div class="form-grid form-grid-2">
+      <div class="field"><label>Modelo</label><select id="mInvModelo"><option value="">-- selecciona --</option></select></div>
+      <div class="field"><label>Color</label><select id="mInvColor"><option value="">-- selecciona --</option></select></div>
+      <div class="field"><label>SKU (generado auto)</label><input type="text" id="mInvSku" readonly/></div>
+      <div class="field"><label>Pares en existencia</label><input type="number" id="mInvPares" value="0" min="0"/></div>
+      <div class="field"><label>Costo producción/par ($)</label><input type="number" id="mInvCosto" step="0.01" value="0"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalInv')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="saveInv()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: DESCONTAR STOCK
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalDescontar">
+  <div class="modal" style="width:360px">
+    <div class="modal-title">Descontar stock</div>
+    <div class="card-title" id="mDescSku" style="margin-bottom:12px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:14px;"></div>
+    <div class="form-grid">
+      <div class="field"><label>Pares a descontar</label><input type="number" id="mDescQty" min="1" value="1"/></div>
+      <div class="field"><label>Cliente (opcional)</label>
+        <select id="mDescCliente"><option value="">-- ninguno --</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalDescontar')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="confirmarDescuento()">Descontar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: CLIENTE
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalCliente">
+  <div class="modal" style="width:600px">
+    <div class="modal-title" id="modalClienteTitle">Nuevo cliente</div>
+    <input type="hidden" id="mCliTipo" value="directo"/>
+    <input type="hidden" id="mCliEditIdx" value=""/>
+    <div class="form-grid form-grid-2">
+      <div class="field"><label>Tipo</label>
+        <select id="mCliTipoSel">
+          <option value="directo">Cliente Directo</option>
+          <option value="distribuidor">Distribuidor</option>
+          <option value="mayoreo">Mayoreo</option>
+        </select>
+      </div>
+      <div class="field"><label>Nombre</label><input type="text" id="mCliNombre"/></div>
+      <div class="field"><label>Contacto</label><input type="text" id="mCliContacto"/></div>
+      <div class="field"><label>RFC</label><input type="text" id="mCliRfc"/></div>
+      <div class="field" style="grid-column:1/-1"><label>Dirección</label><input type="text" id="mCliDir"/></div>
+      <div class="field"><label>Fecha registro</label><input type="date" id="mCliFechaReg"/></div>
+      <div class="field"><label>Fecha última compra</label><input type="date" id="mCliFechaUlt"/></div>
+      <div class="field"><label>Piezas última compra</label><input type="number" id="mCliUltPzas" value="0"/></div>
+      <div class="field"><label>Acumulado histórico</label><input type="number" id="mCliAcum" value="0"/></div>
+      <div class="field" style="grid-column:1/-1"><label>SKUs (separados por coma)</label><input type="text" id="mCliSkus" placeholder="MON-AR-CIR1-ROJ1, MON-AR-HEX3-NEG1"/></div>
+      <div class="field" style="grid-column:1/-1"><label>Notas</label><textarea id="mCliNotas"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalCliente')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="saveCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: VISOR 3D
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalViewer">
+  <div class="viewer-modal">
+    <div class="viewer-header">
+      <div>
+        <div class="viewer-title" id="viewerTitle">—</div>
+        <div style="font-size:11px;color:var(--text2)" id="viewerFolder">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" id="viewerUploadBtn" onclick="subirFotoViewer()">📷 Subir foto</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('modalViewer')">✕ Cerrar</button>
+      </div>
+    </div>
+    <div class="viewer-body">
+      <div class="viewer-canvas-wrap" id="viewerCanvasWrap">
+        <div class="stl-loading" id="viewerLoading">
+          <div class="stl-spinner"></div>
+          <span>Cargando modelo 3D...</span>
+        </div>
+      </div>
+      <div class="viewer-sidebar">
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Código</div>
+          <div class="viewer-info-val" id="viewerCodigo">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Carpeta</div>
+          <div class="viewer-info-val" id="viewerCarpeta" style="font-size:10px;word-break:break-all">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Archivo STL</div>
+          <div class="viewer-info-val" id="viewerArchivo" style="font-size:10px">—</div>
+        </div>
+        <div class="viewer-info-row">
+          <div class="viewer-info-label">Triángulos</div>
+          <div class="viewer-info-val" id="viewerTris">—</div>
+        </div>
+        <hr style="border-color:var(--border)"/>
+        <div style="font-size:10px;color:var(--muted);line-height:1.6;">
+          🖱️ Arrastra para rotar<br/>
+          🖱️ Rueda para zoom<br/>
+          🖱️ Clic derecho para mover
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Three.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CATÁLOGO
+// ════════════════════════════════════════════════════════════
+let catalogoItems    = []
+let catFiltroActual  = 'Todos'
+let viewerData       = null
+let threeRenderer    = null
+let threeScene       = null
+let threeCamera      = null
+let threeAnimId      = null
+
+async function loadCatalogo () {
+  catalogoItems = await api.getCatalogoCompleto(cfg.rutaExcel)
+  renderCatFiltros()
+  renderCatalogo()
+}
+
+function renderCatFiltros () {
+  // Extraer prefijos únicos (CIR, HEX, FLO, etc.)
+  const prefijos = [...new Set(catalogoItems.map(i => i.codigo.replace(/\d+$/, '')))]
+    .sort()
+  const el = document.getElementById('catFiltros')
+  el.innerHTML = `<button class="cat-filtro active" onclick="setCatFiltro('Todos', this)">Todos (${catalogoItems.length})</button>`
+  prefijos.forEach(p => {
+    const count = catalogoItems.filter(i => i.codigo.startsWith(p)).length
+    el.innerHTML += `<button class="cat-filtro" onclick="setCatFiltro('${p}', this)">${p} (${count})</button>`
+  })
+}
+
+function setCatFiltro (filtro, btn) {
+  catFiltroActual = filtro
+  document.querySelectorAll('.cat-filtro').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  renderCatalogo()
+}
+
+function filtrarCatalogo () {
+  renderCatalogo()
+}
+
+function renderCatalogo () {
+  const buscar = (document.getElementById('catBuscar').value || '').toLowerCase()
+  const grid   = document.getElementById('catalogoGrid')
+
+  let items = catalogoItems
+  if (catFiltroActual !== 'Todos') items = items.filter(i => i.codigo.startsWith(catFiltroActual))
+  if (buscar) items = items.filter(i => i.codigo.toLowerCase().includes(buscar))
+
+  if (!items.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;padding:40px">Sin modelos</div>'
+    return
+  }
+
+  grid.innerHTML = items.map(item => `
+    <div class="catalogo-card" onclick="openViewer('${item.codigo}','${item.carpeta}','${item.archivo1}')">
+      <div class="catalogo-card-img" id="thumb-${item.codigo}">
+        <div class="stl-loading">
+          <div class="stl-spinner"></div>
+        </div>
+        <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>
+      </div>
+      <div class="catalogo-card-info">
+        <div class="catalogo-card-code">${item.codigo}</div>
+        <div class="catalogo-card-folder">${item.carpeta}</div>
+        <button class="catalogo-print-btn" id="printbtn-${item.codigo}"
+          onclick="event.stopPropagation();togglePrintSelDesdecatalogo('${item.codigo}','${item.carpeta}','${item.archivo1}',this)">
+          🖨 Imprimir
+        </button>
+      </div>
+    </div>`).join('')
+
+  // Cargar thumbnails en lotes para no saturar WebGL
+  loadThumbsEnLotes(items)
+}
+
+// Carga los thumbnails de 4 en 4 con pausa entre lotes
+async function loadThumbsEnLotes (items) {
+  const LOTE = 4
+  const PAUSA = 200 // ms entre lotes
+
+  for (let i = 0; i < items.length; i += LOTE) {
+    const lote = items.slice(i, i + LOTE)
+    await Promise.all(lote.map(item => loadThumb(item)))
+    if (i + LOTE < items.length) {
+      await new Promise(r => setTimeout(r, PAUSA))
+    }
+  }
+}
+
+async function loadThumb (item) {
+  const container = document.getElementById(`thumb-${item.codigo}`)
+  if (!container) return
+
+  // Primero verificar si hay foto real
+  const foto = await api.getFoto(cfg.rutaAretes, item.codigo)
+  if (foto) {
+    container.innerHTML = `
+      <img src="file:///${foto.replace(/\\/g,'/')}" alt="${item.codigo}"/>
+      <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>`
+    return
+  }
+
+  // Si no hay foto, renderizar STL con Three.js
+  const stlB64 = await api.getStlBase64(cfg.rutaAretes, item.carpeta, item.archivo1)
+  if (!stlB64) {
+    container.innerHTML = `
+      <div style="color:var(--muted);font-size:10px;text-align:center;padding:20px">Sin STL</div>
+      <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>`
+    return
+  }
+
+  // Renderizar miniatura con Three.js — devuelve imagen estática
+  const imgEl = renderSTLThumb(stlB64, 160, 160)
+  container.innerHTML = ''
+  container.appendChild(imgEl)
+  const btn = document.createElement('button')
+  btn.className = 'catalogo-upload-btn'
+  btn.textContent = '📷'
+  btn.onclick = (e) => { e.stopPropagation(); subirFotoGrid(item.codigo) }
+  container.appendChild(btn)
+}
+
+function renderSTLThumb (base64, w, h) {
+  const canvas   = document.createElement('canvas')
+  canvas.width   = w
+  canvas.height  = h
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true })
+  renderer.setSize(w, h)
+  renderer.setPixelRatio(1)
+
+  const scene  = new THREE.Scene()
+  const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 10000)
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8)
+  dirLight.position.set(1, 2, 3)
+  scene.add(dirLight)
+
+  const geometry = parseSTLBase64(base64)
+  const material = new THREE.MeshPhongMaterial({
+    color: 0x155124, specular: 0x333333, shininess: 60
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+
+  // Centrar y escalar
+  geometry.computeBoundingBox()
+  const box    = geometry.boundingBox
+  const center = new THREE.Vector3()
+  box.getCenter(center)
+  mesh.position.sub(center)
+
+  const size   = new THREE.Vector3()
+  box.getSize(size)
+  const maxDim = Math.max(size.x, size.y, size.z)
+
+  // Vista frontal
+  camera.position.set(0, 0, maxDim * 1.8)
+  camera.lookAt(0, 0, 0)
+
+  renderer.render(scene, camera)
+
+  // Capturar imagen como PNG y liberar el contexto WebGL
+  const imgData = canvas.toDataURL('image/png')
+
+  renderer.dispose()
+  geometry.dispose()
+  material.dispose()
+
+  // Devolver imagen estática en lugar de canvas con contexto activo
+  const img   = document.createElement('img')
+  img.src     = imgData
+  img.style   = 'width:100%;height:100%;object-fit:contain;'
+  return img
+}
+
+function parseSTLBase64 (base64) {
+  const binary  = atob(base64)
+  const buffer  = new ArrayBuffer(binary.length)
+  const view    = new Uint8Array(buffer)
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i)
+
+  const dataView = new DataView(buffer)
+  const numTris  = dataView.getUint32(80, true)
+  const geometry = new THREE.BufferGeometry()
+  const vertices = new Float32Array(numTris * 9)
+  const normals  = new Float32Array(numTris * 9)
+
+  for (let i = 0; i < numTris; i++) {
+    const offset = 84 + i * 50
+    const nx = dataView.getFloat32(offset,      true)
+    const ny = dataView.getFloat32(offset + 4,  true)
+    const nz = dataView.getFloat32(offset + 8,  true)
+    for (let v = 0; v < 3; v++) {
+      const vOff = offset + 12 + v * 12
+      vertices[i * 9 + v * 3]     = dataView.getFloat32(vOff,     true)
+      vertices[i * 9 + v * 3 + 1] = dataView.getFloat32(vOff + 4, true)
+      vertices[i * 9 + v * 3 + 2] = dataView.getFloat32(vOff + 8, true)
+      normals[i * 9 + v * 3]     = nx
+      normals[i * 9 + v * 3 + 1] = ny
+      normals[i * 9 + v * 3 + 2] = nz
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
+  geometry.setAttribute('normal',   new THREE.BufferAttribute(normals,  3))
+  return geometry
+}
+
+// ─── Visor 3D completo (modal) ────────────────────────────
+async function openViewer (codigo, carpeta, archivo1) {
+  viewerData = { codigo, carpeta, archivo1 }
+  document.getElementById('viewerTitle').textContent   = codigo
+  document.getElementById('viewerFolder').textContent  = carpeta
+  document.getElementById('viewerCodigo').textContent  = codigo
+  document.getElementById('viewerCarpeta').textContent = carpeta
+  document.getElementById('viewerArchivo').textContent = archivo1
+  document.getElementById('viewerTris').textContent    = '...'
+  document.getElementById('viewerLoading').style.display = 'flex'
+
+  openModal('modalViewer')
+
+  // Limpiar renderer anterior
+  if (threeRenderer) { threeRenderer.dispose(); threeRenderer = null }
+  if (threeAnimId)   { cancelAnimationFrame(threeAnimId); threeAnimId = null }
+  const wrap = document.getElementById('viewerCanvasWrap')
+  wrap.querySelectorAll('canvas').forEach(c => c.remove())
+
+  // Verificar foto real primero
+  const foto = await api.getFoto(cfg.rutaAretes, codigo)
+  if (foto) {
+    document.getElementById('viewerLoading').style.display = 'none'
+    const img = document.createElement('img')
+    img.src   = `file:///${foto.replace(/\\/g,'/')}`
+    img.style = 'max-width:100%;max-height:100%;object-fit:contain;'
+    wrap.appendChild(img)
+    return
+  }
+
+  // Cargar STL
+  const stlB64 = await api.getStlBase64(cfg.rutaAretes, carpeta, archivo1)
+  if (!stlB64) {
+    document.getElementById('viewerLoading').innerHTML =
+      '<span style="color:var(--error)">STL no encontrado</span>'
+    return
+  }
+
+  document.getElementById('viewerLoading').style.display = 'none'
+
+  const W = wrap.clientWidth  || 460
+  const H = wrap.clientHeight || 400
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer.setSize(W, H)
+  renderer.setPixelRatio(window.devicePixelRatio)
+  wrap.appendChild(renderer.domElement)
+  threeRenderer = renderer
+
+  const scene  = new THREE.Scene()
+  scene.background = new THREE.Color(0xF0F2F5)
+  threeScene = scene
+
+  const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100000)
+  threeCamera  = camera
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+  const d1 = new THREE.DirectionalLight(0xffffff, 0.8)
+  d1.position.set(1, 2, 3); scene.add(d1)
+  const d2 = new THREE.DirectionalLight(0x8888ff, 0.3)
+  d2.position.set(-1, -1, -1); scene.add(d2)
+
+  const geometry = parseSTLBase64(stlB64)
+  const material = new THREE.MeshPhongMaterial({
+    color: 0x155124, specular: 0x222222, shininess: 80
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+
+  geometry.computeBoundingBox()
+  const box    = geometry.boundingBox
+  const center = new THREE.Vector3()
+  box.getCenter(center)
+  mesh.position.sub(center)
+
+  const size   = new THREE.Vector3()
+  box.getSize(size)
+  const maxDim = Math.max(size.x, size.y, size.z)
+
+  // Vista frontal
+  camera.position.set(0, 0, maxDim * 2)
+  camera.lookAt(0, 0, 0)
+
+  // Num triángulos
+  const numTris = geometry.attributes.position.count / 3
+  document.getElementById('viewerTris').textContent = numTris.toLocaleString()
+
+  // Orbit controls manual (drag para rotar, wheel para zoom)
+  let isDragging = false, prevX = 0, prevY = 0
+  let rotX = 0, rotY = 0
+
+  renderer.domElement.addEventListener('mousedown', e => {
+    isDragging = true; prevX = e.clientX; prevY = e.clientY
+  })
+  window.addEventListener('mouseup', () => isDragging = false)
+  renderer.domElement.addEventListener('mousemove', e => {
+    if (!isDragging) return
+    rotY += (e.clientX - prevX) * 0.01
+    rotX += (e.clientY - prevY) * 0.01
+    prevX = e.clientX; prevY = e.clientY
+    mesh.rotation.x = rotX
+    mesh.rotation.y = rotY
+  })
+  renderer.domElement.addEventListener('wheel', e => {
+    camera.position.z += e.deltaY * 0.5
+    camera.position.z = Math.max(maxDim * 0.5, Math.min(maxDim * 5, camera.position.z))
+  })
+
+  const animate = () => {
+    threeAnimId = requestAnimationFrame(animate)
+    renderer.render(scene, camera)
+  }
+  animate()
+}
+
+// ─── Subir foto ───────────────────────────────────────────
+async function subirFotoGrid (codigo) {
+  const src = await api.selectFoto(cfg.rutaAretes)
+  if (!src) return
+  const dest = await api.saveFoto(cfg.rutaAretes, codigo, src)
+  if (dest) {
+    // Recargar thumbnail
+    const item = catalogoItems.find(i => i.codigo === codigo)
+    if (item) loadThumb(item)
+  }
+}
+
+async function subirFotoViewer () {
+  if (!viewerData) return
+  await subirFotoGrid(viewerData.codigo)
+  // Reabrir el visor con la foto nueva
+  openViewer(viewerData.codigo, viewerData.carpeta, viewerData.archivo1)
+}
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ════════════════════════════════════════════════════════════
+let cfg       = {}
+let colores   = []
+let inventario= []
+let clientes  = { directo:[], distribuidor:[], mayoreo:[] }
+let costos    = []
+let cliTabActual = 'directo'
+let gcodeActual  = null
+let costoActual  = null
+let skuDescontar = null
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+async function init () {
+  cfg = await api.getConfig()
+  renderConfig()
+  await loadColores()
+  await loadInventario()
+  await loadClientes()
+  await loadCostos()
+  await loadCatalogoCodigos()
+  await loadCatalogo()
+  populateColorSelects()
+}
+init()
+
+// ════════════════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ════════════════════════════════════════════════════════════
+function showPage (id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-' + id).classList.add('active')
+  document.getElementById('nav-' + id).classList.add('active')
+  // Al volver al catálogo, actualizar el estado visual de los botones de print
+  if (id === 'catalogo') sincronizarBotonesCatalogo()
+  // Al entrar a imprimir, actualizar el buscador y grid
+  if (id === 'imprimir') { refreshPrinterStatus(); renderPrintGrid() }
+}
+
+function showCliTab (tipo) {
+  cliTabActual = tipo
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'))
+  document.getElementById('ctab-' + tipo).classList.add('active')
+  renderClientes()
+}
+
+// ════════════════════════════════════════════════════════════
+//  MODALES
+// ════════════════════════════════════════════════════════════
+function openModal  (id) { document.getElementById(id).classList.add('open') }
+function closeModal (id) { document.getElementById(id).classList.remove('open') }
+
+// ════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════════
+function renderConfig () {
+  document.getElementById('cfgMarca').value       = cfg.marca            || ''
+  document.getElementById('cfgPrefijo').value     = cfg.prefijoSKU       || ''
+  document.getElementById('cfgTipo').value        = cfg.tipoAccesorio    || ''
+  document.getElementById('cfgKwh').value         = cfg.costoKwh         || ''
+  document.getElementById('cfgWatts').value       = cfg.wattsPrinter     || ''
+  document.getElementById('cfgHerrajes').value    = cfg.costoHerrajes    || ''
+  document.getElementById('cfgDesperdicio').value = cfg.porcDesperdicio  || ''
+  document.getElementById('cfgEmpaque').value     = cfg.costoEmpaque     || ''
+  // Nuevos campos impresora
+  document.getElementById('cfgMoonrakerIp').value = cfg.moonrakerIp      || '192.168.68.113:7125'
+  document.getElementById('cfgZOffset').value     = cfg.zOffset          !== undefined ? cfg.zOffset : 0.190
+  document.getElementById('cfgMaxModelos').value  = cfg.maxModelosPlaca  || 7
+  const setPath = (id, val) => {
+    const el = document.getElementById(id)
+    el.textContent = val || 'No configurado'
+    el.className   = 'path-val' + (val ? ' set' : '')
+  }
+  setPath('pAretesVal', cfg.rutaAretes)
+  setPath('pExcelVal',  cfg.rutaExcel)
+  setPath('pGcodesVal', cfg.rutaGcodes)
+  setPath('pOrcaVal',   cfg.orcaSlicerPath)
+}
+
+async function saveConfig () {
+  cfg.marca            = document.getElementById('cfgMarca').value
+  cfg.prefijoSKU       = document.getElementById('cfgPrefijo').value.toUpperCase().substring(0,3)
+  cfg.tipoAccesorio    = document.getElementById('cfgTipo').value.toUpperCase()
+  cfg.costoKwh         = parseFloat(document.getElementById('cfgKwh').value)         || 0
+  cfg.wattsPrinter     = parseFloat(document.getElementById('cfgWatts').value)       || 0
+  cfg.costoHerrajes    = parseFloat(document.getElementById('cfgHerrajes').value)    || 0
+  cfg.porcDesperdicio  = parseFloat(document.getElementById('cfgDesperdicio').value) || 0
+  cfg.costoEmpaque     = parseFloat(document.getElementById('cfgEmpaque').value)     || 0
+  // Nuevos campos impresora
+  cfg.moonrakerIp      = document.getElementById('cfgMoonrakerIp').value.trim()
+  cfg.zOffset          = parseFloat(document.getElementById('cfgZOffset').value)     || 0.190
+  cfg.maxModelosPlaca  = parseInt(document.getElementById('cfgMaxModelos').value)    || 7
+  await api.saveConfig(cfg)
+  renderConfig()
+  alert('Configuración guardada.')
+}
+
+async function changePath (key) {
+  let p = null
+  if (key === 'rutaExcel') p = await api.selectExcel(cfg[key])
+  else p = await api.selectFolder(cfg[key])
+  if (p) { cfg[key] = p; await api.saveConfig(cfg); renderConfig() }
+}
+
+async function changeOrcaPath () {
+  const p = await api.selectOrcaExe(cfg.orcaSlicerPath)
+  if (p) { cfg.orcaSlicerPath = p; await api.saveConfig(cfg); renderConfig() }
+}
+
+async function testMoonraker () {
+  const el = document.getElementById('moonrakerTestResult')
+  el.style.color = 'var(--text2)'
+  el.textContent = 'Probando...'
+  const ip = document.getElementById('cfgMoonrakerIp').value.trim() || cfg.moonrakerIp
+  const res = await api.moonrakerStatus(ip)
+  if (res.ok) {
+    el.style.color = 'var(--ok)'
+    el.textContent = `✓ ${res.state} — ${res.extTemp.toFixed(0)}°C extrusor`
+  } else {
+    el.style.color = 'var(--error)'
+    el.textContent = `✗ Sin conexión: ${res.error || 'timeout'}`
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  SINCRONIZAR
+// ════════════════════════════════════════════════════════════
+let syncRunning = false
+
+function appendLog ({ type, data }) {
+  const log   = document.getElementById('syncLog')
+  const empty = log.querySelector('.log-empty')
+  if (empty) empty.remove()
+  const time  = new Date().toLocaleTimeString('es-MX', { hour12: false })
+  const line  = document.createElement('div')
+  line.className = `log-line type-${type}`
+  const icons = { ok:'✓', warn:'⚠', error:'✗', info:'›', item:'·', folder:'▶', muted:' ', divider:'' }
+  const ind   = { ok:'    ', warn:'    ', error:'    ', item:'  ', folder:'', muted:'    ', divider:'' }
+  line.innerHTML = type === 'divider'
+    ? `<span class="log-prefix"></span><span class="log-msg">${'─'.repeat(48)}</span>`
+    : `<span class="log-prefix">[${time}]</span><span class="log-msg">${(ind[type]||'')}${icons[type]||'›'} ${data}</span>`
+  log.appendChild(line)
+  log.scrollTop = log.scrollHeight
+}
+
+function clearLog () {
+  document.getElementById('syncLog').innerHTML = '<div class="log-empty">Log limpiado</div>'
+}
+
+async function startSync () {
+  if (syncRunning) return
+  syncRunning = true
+  const btn = document.getElementById('btnSync')
+  btn.disabled = true
+  btn.textContent = '⟳ Sincronizando...'
+  document.getElementById('liveDot').classList.add('on')
+  document.getElementById('syncLog').innerHTML = ''
+  document.getElementById('sRen').textContent = '0'
+  document.getElementById('sAgr').textContent = '0'
+  document.getElementById('sAdv').textContent = '0'
+  document.getElementById('sErr').textContent = '0'
+  document.getElementById('sRenBar').style.width = '0%'
+  document.getElementById('sAgrBar').style.width = '0%'
+  document.getElementById('sAdvBar').style.width = '0%'
+  document.getElementById('sErrBar').style.width = '0%'
+
+  api.offSyncLog()
+  api.onSyncLog(appendLog)
+
+  const stats = await api.sync({ rutaBase: cfg.rutaAretes, rutaExcel: cfg.rutaExcel })
+  document.getElementById('sRen').textContent = stats.renombrados
+  document.getElementById('sAgr').textContent = stats.agregados
+  document.getElementById('sAdv').textContent = stats.advertencias
+  document.getElementById('sErr').textContent = stats.errores
+  // Animar barras de progreso
+  const total = stats.renombrados + stats.agregados + stats.advertencias + stats.errores || 1
+  setTimeout(() => {
+    document.getElementById('sRenBar').style.width = Math.min(100, (stats.renombrados/total)*100) + '%'
+    document.getElementById('sAgrBar').style.width = Math.min(100, (stats.agregados/total)*100) + '%'
+    document.getElementById('sAdvBar').style.width = Math.min(100, (stats.advertencias/total)*100) + '%'
+    document.getElementById('sErrBar').style.width = Math.min(100, (stats.errores/total)*100) + '%'
+  }, 100)
+  document.getElementById('liveDot').classList.remove('on')
+  btn.disabled = false
+  btn.textContent = '⟳ Sincronizar Ahora'
+  syncRunning = false
+
+  await loadInventario()
+  populateModeloSelects()
+}
+
+// ════════════════════════════════════════════════════════════
+//  COLORES
+// ════════════════════════════════════════════════════════════
+async function loadColores () {
+  colores = await api.getColores(cfg.rutaExcel)
+  renderColores()
+}
+
+function renderColores () {
+  const tb = document.getElementById('bodyColores')
+  if (!colores.length) { tb.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sin colores registrados</td></tr>'; return }
+  tb.innerHTML = colores.map(c => `
+    <tr>
+      <td><span class="color-swatch" style="background:${c.hex||'#888'}"></span></td>
+      <td>${c.nombre}</td>
+      <td class="td-mono"><span class="badge badge-accent">${c.codigo}</span></td>
+      <td style="color:var(--text2)">${c.descripcion||'—'}</td>
+      <td class="td-mono">${c.stockGr||0} gr</td>
+      <td class="td-mono">$${(+c.costoPorKg||0).toFixed(2)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editColor('${c.nombre}')">Editar</button>
+        <button class="btn btn-danger btn-sm"    onclick="deleteColor('${c.nombre}')">Borrar</button>
+      </div></td>
+    </tr>`).join('')
+}
+
+function openModalColor (nombre) {
+  document.getElementById('modalColorTitle').textContent = nombre ? 'Editar color' : 'Nuevo color'
+  if (nombre) {
+    const c = colores.find(x => x.nombre === nombre)
+    document.getElementById('mColorNombre').value = c.nombre
+    document.getElementById('mColorHex').value    = c.hex    || '#000000'
+    document.getElementById('mColorCodigo').value = c.codigo || ''
+    document.getElementById('mColorDesc').value   = c.descripcion || ''
+    document.getElementById('mColorStock').value  = c.stockGr || 0
+    document.getElementById('mColorCosto').value  = c.costoPorKg || 0
+  } else {
+    ['mColorNombre','mColorCodigo','mColorDesc'].forEach(id => document.getElementById(id).value = '')
+    document.getElementById('mColorHex').value   = '#F0A500'
+    document.getElementById('mColorStock').value = 0
+    document.getElementById('mColorCosto').value = 0
+  }
+  openModal('modalColor')
+}
+function editColor (n) { openModalColor(n) }
+
+async function saveColor () {
+  const color = {
+    nombre:      document.getElementById('mColorNombre').value.trim(),
+    hex:         document.getElementById('mColorHex').value,
+    codigo:      document.getElementById('mColorCodigo').value.trim().toUpperCase() || null,
+    descripcion: document.getElementById('mColorDesc').value.trim(),
+    stockGr:     parseFloat(document.getElementById('mColorStock').value) || 0,
+    costoPorKg:  parseFloat(document.getElementById('mColorCosto').value) || 0
+  }
+  if (!color.nombre) { alert('El nombre es obligatorio.'); return }
+  const cod = await api.saveColor(cfg.rutaExcel, color)
+  if (cod) { closeModal('modalColor'); await loadColores(); populateColorSelects() }
+  else alert('Error al guardar el color.')
+}
+
+async function deleteColor (nombre) {
+  if (!confirm(`¿Eliminar el color "${nombre}"?`)) return
+  await api.deleteColor(cfg.rutaExcel, nombre)
+  await loadColores()
+  populateColorSelects()
+}
+
+// ════════════════════════════════════════════════════════════
+//  INVENTARIO
+// ════════════════════════════════════════════════════════════
+async function loadInventario () {
+  inventario = await api.getInventario(cfg.rutaExcel)
+  renderInventario()
+}
+
+function renderInventario () {
+  const tb = document.getElementById('bodyInv')
+  if (!inventario.length) { tb.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Sin registros</td></tr>'; return }
+  tb.innerHTML = inventario.map(i => `
+    <tr>
+      <td class="td-sku">${i.sku}</td>
+      <td class="td-mono">${i.modelo}</td>
+      <td style="display:flex;align-items:center;gap:6px;">
+        <span class="color-swatch" style="background:${getHexColor(i.codigoColor)}"></span>${i.color}
+      </td>
+      <td><span class="badge ${i.pares > 0 ? 'badge-ok' : 'badge-error'}">${i.pares} pares</span></td>
+      <td class="td-mono">$${(+i.costoProduccion||0).toFixed(2)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openDescontar('${i.sku}')">Venta</button>
+        <button class="btn btn-danger btn-sm"    onclick="deleteInv('${i.sku}')">Borrar</button>
+      </div></td>
+    </tr>`).join('')
+}
+
+function getHexColor (codigo) {
+  const c = colores.find(x => x.codigo === codigo)
+  return c ? c.hex : '#888'
+}
+
+function openModalInv () {
+  document.getElementById('mInvSku').value   = ''
+  document.getElementById('mInvPares').value = 0
+  document.getElementById('mInvCosto').value = 0
+  openModal('modalInv')
+}
+
+function genSku () {
+  const modelo = document.getElementById('mInvModelo').value
+  const codCol = document.getElementById('mInvColor').value
+  if (!modelo || !codCol) { document.getElementById('mInvSku').value = ''; return }
+  document.getElementById('mInvSku').value =
+    `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${modelo}-${codCol}`
+}
+
+async function saveInv () {
+  const sku = document.getElementById('mInvSku').value.trim()
+  if (!sku) { alert('Selecciona modelo y color.'); return }
+  const modelo  = document.getElementById('mInvModelo').value
+  const codCol  = document.getElementById('mInvColor').value
+  const colorObj= colores.find(c => c.codigo === codCol)
+  const item = {
+    sku, modelo,
+    color:           colorObj ? colorObj.nombre : codCol,
+    codigoColor:     codCol,
+    pares:           parseInt(document.getElementById('mInvPares').value) || 0,
+    costoProduccion: parseFloat(document.getElementById('mInvCosto').value) || 0
+  }
+  await api.saveInventario(cfg.rutaExcel, item)
+  closeModal('modalInv')
+  await loadInventario()
+}
+
+async function deleteInv (sku) {
+  if (!confirm(`¿Eliminar SKU "${sku}" del inventario?`)) return
+  await api.deleteInventario(cfg.rutaExcel, sku)
+  await loadInventario()
+}
+
+// Descontar stock al vender
+function openDescontar (sku) {
+  skuDescontar = sku
+  document.getElementById('mDescSku').textContent = sku
+  document.getElementById('mDescQty').value = 1
+  // Poblar select de clientes
+  const sel = document.getElementById('mDescCliente')
+  sel.innerHTML = '<option value="">-- ninguno --</option>'
+  const todos = [...clientes.directo, ...clientes.distribuidor, ...clientes.mayoreo]
+  todos.forEach(c => { sel.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>` })
+  openModal('modalDescontar')
+}
+
+async function confirmarDescuento () {
+  const qty = parseInt(document.getElementById('mDescQty').value) || 1
+  const res = await api.descontarStock(cfg.rutaExcel, skuDescontar, qty)
+  if (res.ok) {
+    // Actualizar SKUs del cliente seleccionado
+    const nomCli = document.getElementById('mDescCliente').value
+    if (nomCli) {
+      const tipos = ['directo','distribuidor','mayoreo']
+      for (const tipo of tipos) {
+        const cli = clientes[tipo].find(c => c.nombre === nomCli)
+        if (cli) {
+          if (!cli.skus.includes(skuDescontar)) cli.skus.push(skuDescontar)
+          const prevAcum = cli.acumuladoHistorico || 0
+          const prevUlt  = cli.piezasUltimaCompra || 0
+          await api.saveCliente(cfg.rutaExcel, {
+            ...cli, tipo,
+            _editIndex:          cli._idx,
+            acumuladoHistorico:  prevAcum + prevUlt,
+            piezasUltimaCompra:  qty * 2,
+            fechaUltimaCompra:   new Date().toISOString().split('T')[0],
+            skus:                cli.skus
+          })
+          break
+        }
+      }
+    }
+    closeModal('modalDescontar')
+    await loadInventario()
+    await loadClientes()
+    alert(res.msg)
+  } else {
+    alert('Error: ' + res.msg)
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CLIENTES
+// ════════════════════════════════════════════════════════════
+async function loadClientes () {
+  clientes = await api.getClientes(cfg.rutaExcel)
+  renderClientes()
+}
+
+function renderClientes () {
+  const tb   = document.getElementById('bodyClientes')
+  const data = clientes[cliTabActual] || []
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px">Sin clientes registrados</td></tr>'; return }
+  tb.innerHTML = data.map(c => `
+    <tr>
+      <td>${c.nombre}</td>
+      <td style="color:var(--text2)">${c.contacto||'—'}</td>
+      <td class="td-mono" style="color:var(--text2)">${c.rfc||'—'}</td>
+      <td style="color:var(--text2)">${c.fechaRegistro||'—'}</td>
+      <td style="color:var(--text2)">${c.fechaUltimaCompra||'—'}</td>
+      <td class="td-mono">${c.piezasUltimaCompra||0}</td>
+      <td class="td-mono">${c.acumuladoHistorico||0}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(c.skus||[]).join(', ')}">
+        ${(c.skus||[]).map(s=>`<span class="badge badge-accent" style="margin:1px;font-size:8px">${s}</span>`).join('')||'—'}
+      </td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editCliente('${cliTabActual}',${c._idx})">Editar</button>
+        <button class="btn btn-danger btn-sm"    onclick="deleteCliente('${cliTabActual}',${c._idx})">Borrar</button>
+      </div></td>
+    </tr>`).join('')
+}
+
+function openModalCliente () {
+  document.getElementById('modalClienteTitle').textContent = 'Nuevo cliente'
+  document.getElementById('mCliEditIdx').value = ''
+  document.getElementById('mCliTipoSel').value = cliTabActual
+  ;['mCliNombre','mCliContacto','mCliRfc','mCliDir','mCliFechaReg',
+    'mCliFechaUlt','mCliSkus','mCliNotas'].forEach(id => document.getElementById(id).value = '')
+  document.getElementById('mCliUltPzas').value = 0
+  document.getElementById('mCliAcum').value    = 0
+  document.getElementById('mCliFechaReg').value = new Date().toISOString().split('T')[0]
+  openModal('modalCliente')
+}
+
+function editCliente (tipo, idx) {
+  const c = clientes[tipo][idx]
+  document.getElementById('modalClienteTitle').textContent = 'Editar cliente'
+  document.getElementById('mCliEditIdx').value    = idx
+  document.getElementById('mCliTipoSel').value    = tipo
+  document.getElementById('mCliNombre').value     = c.nombre       || ''
+  document.getElementById('mCliContacto').value   = c.contacto     || ''
+  document.getElementById('mCliRfc').value        = c.rfc          || ''
+  document.getElementById('mCliDir').value        = c.direccion    || ''
+  document.getElementById('mCliFechaReg').value   = c.fechaRegistro|| ''
+  document.getElementById('mCliFechaUlt').value   = c.fechaUltimaCompra || ''
+  document.getElementById('mCliUltPzas').value    = c.piezasUltimaCompra || 0
+  document.getElementById('mCliAcum').value       = c.acumuladoHistorico || 0
+  document.getElementById('mCliSkus').value       = (c.skus||[]).join(', ')
+  document.getElementById('mCliNotas').value      = c.notas        || ''
+  openModal('modalCliente')
+}
+
+async function saveCliente () {
+  const nombre = document.getElementById('mCliNombre').value.trim()
+  if (!nombre) { alert('El nombre es obligatorio.'); return }
+  const editIdx = document.getElementById('mCliEditIdx').value
+  const tipo    = document.getElementById('mCliTipoSel').value
+  const skusRaw = document.getElementById('mCliSkus').value
+  const cliente = {
+    tipo,
+    nombre,
+    contacto:           document.getElementById('mCliContacto').value.trim(),
+    rfc:                document.getElementById('mCliRfc').value.trim(),
+    direccion:          document.getElementById('mCliDir').value.trim(),
+    fechaRegistro:      document.getElementById('mCliFechaReg').value,
+    fechaUltimaCompra:  document.getElementById('mCliFechaUlt').value,
+    piezasUltimaCompra: parseInt(document.getElementById('mCliUltPzas').value) || 0,
+    acumuladoHistorico: parseInt(document.getElementById('mCliAcum').value)    || 0,
+    skus:               skusRaw ? skusRaw.split(',').map(s=>s.trim()).filter(Boolean) : [],
+    notas:              document.getElementById('mCliNotas').value.trim(),
+    _editIndex:         editIdx !== '' ? parseInt(editIdx) : undefined
+  }
+  await api.saveCliente(cfg.rutaExcel, cliente)
+  closeModal('modalCliente')
+  await loadClientes()
+}
+
+async function deleteCliente (tipo, idx) {
+  if (!confirm('¿Eliminar este cliente?')) return
+  await api.deleteCliente(cfg.rutaExcel, idx, tipo)
+  await loadClientes()
+}
+
+// ════════════════════════════════════════════════════════════
+//  COSTOS — G-code
+// ════════════════════════════════════════════════════════════
+async function loadGcode () {
+  const p = await api.selectGcode(cfg.rutaGcodes)
+  if (!p) return
+  document.getElementById('gcodePath').textContent  = p
+  document.getElementById('gcodePath').className    = 'path-val set'
+  const data = await api.parseGcode(p)
+  if (data.error) { alert('Error al leer el G-code: ' + data.error); return }
+  gcodeActual = data
+  document.getElementById('gcPeso').value      = data.pesoGr    || ''
+  document.getElementById('gcHoras').value     = data.horasImp  ? data.horasImp.toFixed(2) : ''
+  document.getElementById('gcFilamento').value = data.filamento || ''
+  document.getElementById('gcodeData').style.display = 'block'
+  // Pre-llenar costo/kg del color seleccionado
+  rellenarCostoKg()
+}
+
+function rellenarCostoKg () {
+  const codCol  = document.getElementById('costoColor').value
+  const colorObj= colores.find(c => c.codigo === codCol)
+  if (colorObj) document.getElementById('costoCostoKg').value = colorObj.costoPorKg || ''
+}
+
+async function calcularCosto () {
+  const pesoGr   = parseFloat(document.getElementById('gcPeso').value)
+  const horasImp = parseFloat(document.getElementById('gcHoras').value)
+  const costoKg  = parseFloat(document.getElementById('costoCostoKg').value)
+  if (!pesoGr || !horasImp || !costoKg) { alert('Completa todos los campos antes de calcular.'); return }
+
+  const res = await api.calcCosto({
+    pesoGr, horasImp, costoPorKg: costoKg,
+    costoKwh:       cfg.costoKwh       || 0,
+    wattsPrinter:   cfg.wattsPrinter   || 0,
+    costoHerrajes:  cfg.costoHerrajes  || 0,
+    porcDesperdicio:cfg.porcDesperdicio|| 0,
+    costoEmpaque:   cfg.costoEmpaque   || 0
+  })
+  costoActual = res
+
+  document.getElementById('costoBreakdown').innerHTML = `
+    <div class="cost-row"><span class="cost-label">Filamento</span><span class="cost-val">$${res.costoFilamento.toFixed(2)}</span></div>
+    <div class="cost-row"><span class="cost-label">Electricidad</span><span class="cost-val">$${res.costoElectricidad.toFixed(2)}</span></div>
+    <div class="cost-row"><span class="cost-label">Herrajes</span><span class="cost-val">$${res.costoHerrajes.toFixed(2)}</span></div>
+    <div class="cost-row"><span class="cost-label">Empaque</span><span class="cost-val">$${res.costoEmpaque.toFixed(2)}</span></div>
+    <div class="cost-row"><span class="cost-label">Desperdicio (${cfg.porcDesperdicio||0}%)</span><span class="cost-val">$${res.desperdicio.toFixed(2)}</span></div>
+    <div class="cost-row"><span class="cost-label">TOTAL POR PAR</span><span class="cost-val">$${res.total.toFixed(2)}</span></div>
+  `
+  document.getElementById('costoResultado').style.display = 'block'
+}
+
+async function guardarCosto () {
+  if (!costoActual) return
+  const modelo = document.getElementById('costoModelo').value
+  const codCol = document.getElementById('costoColor').value
+  if (!modelo || !codCol) { alert('Selecciona modelo y color.'); return }
+  const colorObj = colores.find(c => c.codigo === codCol)
+  const sku = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${modelo}-${codCol}`
+
+  // Guardar en historial de costos
+  await api.saveCosto(cfg.rutaExcel, {
+    sku, modelo, color: colorObj ? colorObj.nombre : codCol,
+    pesoGr:          parseFloat(document.getElementById('gcPeso').value),
+    horasImp:        parseFloat(document.getElementById('gcHoras').value),
+    costoFilamento:  costoActual.costoFilamento,
+    costoElec:       costoActual.costoElectricidad,
+    costoHerrajes:   costoActual.costoHerrajes,
+    costoEmpaque:    costoActual.costoEmpaque,
+    desperdicio:     costoActual.desperdicio,
+    costoTotal:      costoActual.total
+  })
+
+  // Agregar/actualizar en inventario (1 par inicial)
+  const existente = inventario.find(i => i.sku === sku)
+  await api.saveInventario(cfg.rutaExcel, {
+    sku, modelo,
+    color:           colorObj ? colorObj.nombre : codCol,
+    codigoColor:     codCol,
+    pares:           existente ? existente.pares : 0,
+    costoProduccion: costoActual.total
+  })
+
+  await loadCostos()
+  await loadInventario()
+  alert(`Costo guardado e inventario actualizado.\nSKU: ${sku}\nCosto/par: $${costoActual.total.toFixed(2)}`)
+}
+
+async function loadCostos () {
+  costos = await api.getCostos(cfg.rutaExcel)
+  renderCostos()
+}
+
+function renderCostos () {
+  const tb = document.getElementById('bodyCostos')
+  if (!costos.length) { tb.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px">Sin registros</td></tr>'; return }
+  tb.innerHTML = [...costos].reverse().slice(0,20).map(c => `
+    <tr>
+      <td class="td-sku">${c.sku}</td>
+      <td class="td-mono">$${(+c.costoTotal||0).toFixed(2)}</td>
+      <td style="color:var(--text2)">${c.fecha||'—'}</td>
+    </tr>`).join('')
+}
+
+// ════════════════════════════════════════════════════════════
+//  SELECTS — poblar con datos reales
+// ════════════════════════════════════════════════════════════
+let catalogoCodigos = []
+
+async function loadCatalogoCodigos () {
+  catalogoCodigos = await api.getCatalogoCodigos(cfg.rutaExcel)
+  populateModeloSelects()
+}
+
+function populateModeloSelects () {
+  const modelos = [...new Set([
+    ...inventario.map(i => i.modelo),
+    ...catalogoCodigos
+  ])].filter(Boolean).sort()
+
+  const ids = ['mInvModelo','costoModelo']
+  ids.forEach(id => {
+    const sel = document.getElementById(id)
+    const cur = sel.value
+    sel.innerHTML = '<option value="">-- selecciona --</option>'
+    modelos.forEach(m => sel.innerHTML += `<option value="${m}"${m===cur?' selected':''}>${m}</option>`)
+  })
+}
+
+function getCatalogoCodigos () {
+  return catalogoCodigos
+}
+
+function populateColorSelects () {
+  const ids = ['mInvColor','costoColor']
+  ids.forEach(id => {
+    const sel = document.getElementById(id)
+    const cur = sel.value
+    sel.innerHTML = '<option value="">-- selecciona --</option>'
+    colores.forEach(c => sel.innerHTML +=
+      `<option value="${c.codigo}"${c.codigo===cur?' selected':''}>${c.nombre} (${c.codigo})</option>`)
+  })
+}
+
+// Eventos para auto-generar SKU en modal inventario
+document.getElementById('mInvModelo').addEventListener('change', genSku)
+document.getElementById('mInvColor').addEventListener ('change', genSku)
+document.getElementById('costoColor').addEventListener('change', rellenarCostoKg)
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Estado impresora
+// ════════════════════════════════════════════════════════════
+let printSeleccion   = []   // [{codigo, carpeta, archivo1}]
+let printMonitorId   = null // setInterval
+let printJobData     = null // datos del job en curso para inventario
+let printCatFiltro   = 'Todos'
+
+async function refreshPrinterStatus () {
+  const ip  = cfg.moonrakerIp || '192.168.68.113:7125'
+  const res = await api.moonrakerStatus(ip)
+  const dot = document.getElementById('printerDot')
+  const txt = document.getElementById('printerStatusText')
+  const det = document.getElementById('printerStatusDetail')
+
+  if (res.ok) {
+    const stateColor = res.state === 'ready' ? 'var(--ok)'
+      : res.state === 'printing' ? 'var(--accent)' : 'var(--warn)'
+    dot.style.background   = stateColor
+    dot.style.boxShadow    = `0 0 6px ${stateColor}`
+    txt.textContent        = res.state
+    txt.style.color        = stateColor
+    det.innerHTML = `
+      Estado: <span style="color:var(--text)">${res.state}</span><br/>
+      Extrusor: <span style="color:var(--text)">${res.extTemp.toFixed(1)}°C</span><br/>
+      Cama: <span style="color:var(--text)">${res.bedTemp.toFixed(1)}°C</span>
+      ${res.filename ? `<br/>Archivo: <span style="color:var(--accent)">${res.filename}</span>` : ''}
+    `
+  } else {
+    dot.style.background = 'var(--error)'
+    dot.style.boxShadow  = '0 0 6px var(--error)'
+    txt.textContent      = 'Sin conexión'
+    txt.style.color      = 'var(--error)'
+    det.innerHTML        = `<span style="color:var(--error)">No se puede conectar a la impresora</span>`
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Grid de selección
+// ════════════════════════════════════════════════════════════
+function renderPrintGrid () {
+  // Filtros
+  const prefijos = [...new Set(catalogoItems.map(i => i.codigo.replace(/\d+$/, '')))]
+  const filtros  = document.getElementById('printFiltros')
+  filtros.innerHTML = `<button class="cat-filtro ${printCatFiltro==='Todos'?'active':''}"
+    onclick="setPrintFiltro('Todos',this)">Todos</button>`
+  prefijos.forEach(p => {
+    filtros.innerHTML += `<button class="cat-filtro ${printCatFiltro===p?'active':''}"
+      onclick="setPrintFiltro('${p}',this)">${p}</button>`
+  })
+
+  const buscar = (document.getElementById('printBuscar')?.value || '').toLowerCase()
+
+  let items = printCatFiltro === 'Todos'
+    ? catalogoItems
+    : catalogoItems.filter(i => i.codigo.startsWith(printCatFiltro))
+
+  if (buscar) items = items.filter(i => i.codigo.toLowerCase().includes(buscar))
+
+  const grid = document.getElementById('printGrid')
+  grid.innerHTML = items.map(item => {
+    const sel = printSeleccion.find(s => s.codigo === item.codigo)
+    return `<div onclick="togglePrintSel('${item.codigo}','${item.carpeta}','${item.archivo1}')"
+      style="
+        background:${sel ? 'rgba(21,81,36,.1)' : 'var(--s2)'};
+        border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+        border-radius:8px; padding:8px; cursor:pointer; text-align:center;
+        transition:all .15s; user-select:none;
+      ">
+      ${sel ? `<div style="color:var(--accent);font-size:10px;font-weight:700;margin-bottom:4px;">✓ En queue</div>` : ''}
+      <div style="font-family:monospace;font-size:11px;font-weight:700;color:${sel?'var(--accent)':'var(--text)'};">
+        ${item.codigo}
+      </div>
+    </div>`
+  }).join('')
+
+  if (!items.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:11px;grid-column:1/-1;text-align:center;padding:20px">Sin resultados</div>'
+  }
+}
+
+function setPrintFiltro (filtro, btn) {
+  printCatFiltro = filtro
+  renderPrintGrid()
+}
+
+function togglePrintSel (codigo, carpeta, archivo1) {
+  const maxModelos = cfg.maxModelosPlaca || 7
+  const idx = printSeleccion.findIndex(s => s.codigo === codigo)
+  if (idx >= 0) {
+    printSeleccion.splice(idx, 1)
+  } else {
+    if (printSeleccion.length >= maxModelos) {
+      alert(`Máximo ${maxModelos} modelos por placa.\nPuedes cambiar este límite en Configuración.`)
+      return
+    }
+    printSeleccion.push({ codigo, carpeta, archivo1 })
+  }
+  renderPrintGrid()
+  renderPrintQueue()
+  // Sincronizar botón en el catálogo si está visible
+  actualizarBtnCatalogo(codigo)
+}
+
+// Llamado desde el botón "🖨 Imprimir" de cada card del catálogo
+function togglePrintSelDesdecatalogo (codigo, carpeta, archivo1, btn) {
+  const maxModelos = cfg.maxModelosPlaca || 7
+  const idx = printSeleccion.findIndex(s => s.codigo === codigo)
+  if (idx >= 0) {
+    // Ya está en queue — quitar
+    printSeleccion.splice(idx, 1)
+    btn.textContent = '🖨 Imprimir'
+    btn.classList.remove('en-queue')
+  } else {
+    // Agregar al queue
+    if (printSeleccion.length >= maxModelos) {
+      alert(`Máximo ${maxModelos} modelos por placa.\nPuedes cambiar este límite en Configuración.`)
+      return
+    }
+    printSeleccion.push({ codigo, carpeta, archivo1 })
+    btn.textContent = '✓ En queue'
+    btn.classList.add('en-queue')
+  }
+  renderPrintGrid()
+  renderPrintQueue()
+}
+
+// Actualiza el estado visual del botón de catálogo tras cambio desde el print grid
+function actualizarBtnCatalogo (codigo) {
+  const btn = document.getElementById('printbtn-' + codigo)
+  if (!btn) return
+  const enQueue = printSeleccion.some(s => s.codigo === codigo)
+  btn.textContent = enQueue ? '✓ En queue' : '🖨 Imprimir'
+  enQueue ? btn.classList.add('en-queue') : btn.classList.remove('en-queue')
+}
+
+// Resincroniza todos los botones del catálogo con el estado actual del queue
+function sincronizarBotonesCatalogo () {
+  catalogoItems.forEach(item => actualizarBtnCatalogo(item.codigo))
+}
+
+function limpiarSeleccion () {
+  printSeleccion = []
+  renderPrintGrid()
+  renderPrintQueue()
+  sincronizarBotonesCatalogo()
+}
+
+function renderPrintQueue () {
+  const count = document.getElementById('printSelCount')
+  const queue = document.getElementById('printQueue')
+  count.textContent = `${printSeleccion.length} seleccionado${printSeleccion.length !== 1 ? 's' : ''}`
+
+  if (!printSeleccion.length) {
+    queue.innerHTML = '<span style="color:var(--muted)">Ningún modelo seleccionado</span>'
+    return
+  }
+  const pares = parseInt(document.getElementById('printPares').value) || 1
+  queue.innerHTML = printSeleccion.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.codigo}</span>
+      <span style="color:var(--text2)">${pares} par${pares>1?'es':''} × 2 = ${pares*2} piezas</span>
+    </div>`).join('')
+}
+
+// Cuando cambia cantidad de pares actualizar la cola
+document.addEventListener('DOMContentLoaded', () => {
+  const paresInput = document.getElementById('printPares')
+  if (paresInput) paresInput.addEventListener('input', renderPrintQueue)
+})
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Iniciar impresión
+// ════════════════════════════════════════════════════════════
+async function iniciarImpresion () {
+  if (!printSeleccion.length) { alert('Selecciona al menos un modelo.'); return }
+
+  const colorCodigo = document.getElementById('printColor').value
+  if (!colorCodigo) { alert('Selecciona un color/filamento.'); return }
+
+  const colorObj = colores.find(c => c.codigo === colorCodigo)
+  const pares    = parseInt(document.getElementById('printPares').value) || 1
+  const zOffset  = parseFloat(document.getElementById('printZOffset').value) || cfg.zOffset || 0.190
+  const ip       = cfg.moonrakerIp || '192.168.68.113:7125'
+  const orcaPath = cfg.orcaSlicerPath || 'C:\\Program Files\\OrcaSlicer\\OrcaSlicer.exe'
+
+  const btn = document.getElementById('btnImprimir')
+  btn.disabled = true
+  btn.textContent = 'Preparando...'
+
+  try {
+    // ① Mandar ZOffset a Moonraker
+    btn.textContent = '① Enviando ZOffset...'
+    const gcodeRes = await api.moonrakerGcode(ip, `SET_GCODE_OFFSET Z=${zOffset.toFixed(3)}`)
+    if (!gcodeRes.ok) {
+      if (!confirm(`No se pudo enviar el ZOffset: ${gcodeRes.error}\n¿Continuar de todas formas?`)) {
+        btn.disabled = false; btn.textContent = '🖨 Preparar e imprimir'; return
+      }
+    }
+
+    // ② Construir lista de STLs (archivo_1 de cada modelo seleccionado)
+    btn.textContent = '② Abriendo OrcaSlicer...'
+    const stlPaths = []
+    for (const item of printSeleccion) {
+      for (let p = 0; p < pares; p++) {
+        // Agregar ambas piezas del par (_1 y _2)
+        const arch1 = item.archivo1
+        const arch2 = arch1.replace('_1.stl', '_2.stl')
+        stlPaths.push(`${cfg.rutaAretes}\\${item.carpeta}\\${arch1}`)
+        stlPaths.push(`${cfg.rutaAretes}\\${item.carpeta}\\${arch2}`)
+      }
+    }
+
+    const orcaRes = await api.openOrcaSlicer(orcaPath, stlPaths)
+    if (!orcaRes.ok) {
+      alert(`Error al abrir OrcaSlicer: ${orcaRes.error}`)
+      btn.disabled = false; btn.textContent = '🖨 Preparar e imprimir'; return
+    }
+
+    // ③ Guardar datos del job para el inventario
+    printJobData = {
+      modelos:     printSeleccion.map(s => s.codigo),
+      colorCodigo,
+      colorNombre: colorObj ? colorObj.nombre : colorCodigo,
+      pares
+    }
+
+    // ④ Iniciar monitor
+    btn.textContent = '🖨 Preparar e imprimir'
+    btn.disabled    = false
+    iniciarMonitor()
+
+    alert(`OrcaSlicer abierto con ${stlPaths.length} archivos.\n\nHaz Slice y luego Send en OrcaSlicer.\nLa app monitoreará la impresora automáticamente.`)
+
+  } catch (e) {
+    alert('Error: ' + e.message)
+    btn.disabled    = false
+    btn.textContent = '🖨 Preparar e imprimir'
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Monitor de progreso
+// ════════════════════════════════════════════════════════════
+function iniciarMonitor () {
+  const monitor = document.getElementById('printMonitor')
+  monitor.style.display = 'block'
+  if (printMonitorId) clearInterval(printMonitorId)
+
+  let estadoAnterior = ''
+  printMonitorId = setInterval(async () => {
+    const ip  = cfg.moonrakerIp || '192.168.68.113:7125'
+    const res = await api.moonrakerPrintStatus(ip)
+    if (!res.ok) return
+
+    const det = document.getElementById('printMonitorDetail')
+    det.innerHTML = `
+      Estado: <span style="color:var(--text)">${res.state}</span><br/>
+      Archivo: <span style="color:var(--accent)">${res.filename || '—'}</span><br/>
+      Duración: <span style="color:var(--text)">${formatSecs(res.duration)}</span>
+    `
+
+    // También actualizar el dot del header
+    refreshPrinterStatus()
+
+    // Detectar fin de impresión
+    if (res.state === 'complete' && estadoAnterior !== 'complete') {
+      clearInterval(printMonitorId)
+      printMonitorId = null
+      monitor.style.display = 'none'
+      mostrarConfirmacionInventario()
+    }
+    estadoAnterior = res.state
+  }, 10000) // cada 10 segundos
+}
+
+function detenerMonitor () {
+  if (printMonitorId) { clearInterval(printMonitorId); printMonitorId = null }
+  document.getElementById('printMonitor').style.display = 'none'
+}
+
+function formatSecs (secs) {
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = Math.floor(secs % 60)
+  return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRIMIR — Confirmación e inventario
+// ════════════════════════════════════════════════════════════
+function mostrarConfirmacionInventario () {
+  if (!printJobData) return
+  const det = document.getElementById('confirmInvDetalle')
+  det.innerHTML = printJobData.modelos.map(cod => {
+    const sku = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${cod}-${printJobData.colorCodigo}`
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;
+      border-bottom:1px solid var(--border);font-size:12px;">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${sku}</span>
+      <span style="color:var(--text2)">+${printJobData.pares} par${printJobData.pares>1?'es':''}</span>
+    </div>`
+  }).join('')
+  openModal('modalConfirmInv')
+}
+
+async function confirmarAgregarInventario () {
+  if (!printJobData) return
+  const colorObj = colores.find(c => c.codigo === printJobData.colorCodigo)
+
+  for (const codigo of printJobData.modelos) {
+    const sku = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${codigo}-${printJobData.colorCodigo}`
+    const existente = inventario.find(i => i.sku === sku)
+    await api.saveInventario(cfg.rutaExcel, {
+      sku,
+      modelo:          codigo,
+      color:           colorObj ? colorObj.nombre : printJobData.colorCodigo,
+      codigoColor:     printJobData.colorCodigo,
+      pares:           (existente ? existente.pares : 0) + printJobData.pares,
+      costoProduccion: existente ? existente.costoProduccion : 0
+    })
+  }
+
+  closeModal('modalConfirmInv')
+  await loadInventario()
+  printJobData  = null
+  printSeleccion = []
+  renderPrintGrid()
+  renderPrintQueue()
+  alert(`✅ ${printJobData === null ? 'Inventario actualizado correctamente.' : ''}`)
+}
+
+// Inicializar pestaña Imprimir cuando se abre
+const _showPageBase = (id) => {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-' + id).classList.add('active')
+  document.getElementById('nav-' + id).classList.add('active')
+}
+function showPage (id) {
+  _showPageBase(id)
+
+  if (id === 'imprimir') {
+    // Inicializar color select con los colores disponibles
+    const sel = document.getElementById('printColor')
+    const cur = sel.value
+    sel.innerHTML = '<option value="">-- selecciona color --</option>'
+    colores.forEach(c => sel.innerHTML +=
+      `<option value="${c.codigo}"${c.codigo===cur?' selected':''}>${c.nombre} (${c.codigo})</option>`)
+    // ZOffset por defecto
+    document.getElementById('printZOffset').value = cfg.zOffset || 0.190
+    // Renderizar grid si ya hay modelos
+    if (catalogoItems.length) renderPrintGrid()
+    // Verificar estado impresora
+    refreshPrinterStatus()
+  }
+}
+</script>
+</body>
+</html>

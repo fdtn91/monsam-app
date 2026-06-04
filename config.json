@@ -1,0 +1,16 @@
+{
+  "marca": "MONSAM",
+  "prefijoSKU": "MON",
+  "tipoAccesorio": "AR",
+  "rutaAretes": "F:\\DISEÑOS\\Modelos 3D\\aretes",
+  "rutaExcel": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
+  "rutaExcelMonsan": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
+  "rutaDB": "F:\\DISEÑOS\\Modelos 3D\\control\\datos.db",
+  "rutaGcodes": "F:\\DISEÑOS\\Modelos 3D\\aretes\\gcode",
+  "costoKwh": 2.8,
+  "wattsPrinter": 350,
+  "costoHerrajes": 3.5,
+  "porcDesperdicio": 5,
+  "costoEmpaque": 2,
+  "version": "1.0.0"
+}
