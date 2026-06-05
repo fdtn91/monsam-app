@@ -1096,6 +1096,29 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             </div>
           </div>
 
+          <!-- ── App móvil ── -->
+          <div class="card" style="grid-column:1/-1;">
+            <div class="card-title">App móvil — Servidor local</div>
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px;">IP de esta PC</div>
+                <div id="cfgLocalIp" style="font-family:monospace;font-size:16px;color:var(--accent);font-weight:700;">—</div>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px;">Puerto</div>
+                <div style="font-family:monospace;font-size:16px;color:var(--accent);font-weight:700;">4000</div>
+              </div>
+              <div style="flex:1;min-width:200px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px;">URL para la app móvil</div>
+                <div id="cfgApiUrl" style="font-family:monospace;font-size:13px;color:var(--text);background:var(--s2);padding:6px 10px;border-radius:6px;border:1px solid var(--border);">—</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;padding:10px 14px;background:rgba(9,105,218,.06);border:1px solid rgba(9,105,218,.2);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.7;">
+              📱 Abre la app en tu celular → <strong>Configuración</strong> → ingresa la URL de arriba.<br/>
+              ⚠️ El celular y la PC deben estar en la <strong>misma red WiFi</strong>.
+            </div>
+          </div>
+
           <div class="card">
             <div class="card-title">OrcaSlicer</div>
             <div class="path-item" onclick="changeOrcaPath()" id="pOrca">
@@ -1900,6 +1923,8 @@ function renderConfig () {
   setPath('pExcelVal',  cfg.rutaExcel)
   setPath('pGcodesVal', cfg.rutaGcodes)
   setPath('pOrcaVal',   cfg.orcaSlicerPath)
+  // Rellenar info de conexión móvil
+  actualizarInfoConexion()
 }
 
 async function saveConfig () {
