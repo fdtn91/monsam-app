@@ -641,7 +641,8 @@ tr:hover td{ background:rgba(21,81,36,.04); }
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel</button>
-          <button class="btn btn-primary" id="btnSync" onclick="startSync()">⟳ Sincronizar Ahora</button>
+          <button class="btn btn-secondary" id="btnCompare" onclick="startCompare()">🔍 Comparar DB vs Carpetas</button>
+          <button class="btn btn-primary" id="btnSync" onclick="startSync()">⟳ Sincronizar STLs</button>
         </div>
       </div>
       <div class="page-body">
@@ -694,6 +695,31 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             </div>
             <div class="stat-bar"><div class="stat-bar-fill" id="sErrBar" style="width:0%;background:var(--error)"></div></div>
           </div>
+          <!-- Nuevas stats de comparación -->
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-ok" id="sSoloCarpeta">—</div>
+                <div class="stat-lbl">Solo en carpeta</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(9,105,218,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#0969DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sSoloCarpetaBar" style="width:0%;background:#0969DA"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-top">
+              <div>
+                <div class="stat-num c-warn" id="sSoloDB">—</div>
+                <div class="stat-lbl">Solo en DB</div>
+              </div>
+              <div class="stat-icon" style="background:rgba(130,80,223,.12)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#8250DF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              </div>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="sSoloDBBar" style="width:0%;background:#8250DF"></div></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-title" style="display:flex;align-items:center;gap:8px;">
@@ -701,7 +727,21 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             Registro de actividad
             <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearLog()">Limpiar</button>
           </div>
-          <div id="syncLog"><div class="log-empty">Presiona Sincronizar Ahora para comenzar</div></div>
+          <div id="syncLog"><div class="log-empty">Presiona Sincronizar STLs para comenzar</div></div>
+        </div>
+        <!-- Log de comparación DB vs Carpetas -->
+        <div class="card" id="compareCard" style="display:none;">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+            <span>🔍 Comparación DB vs Carpetas</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearCompare()">Limpiar</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;" id="compareActions"></div>
+          <div id="compareLog" style="
+            background:var(--s2);border:1px solid var(--border);border-radius:8px;
+            padding:14px;font-family:monospace;font-size:12px;
+            line-height:1.8;max-height:320px;overflow-y:auto;">
+            <div class="log-empty">Presiona Comparar DB vs Carpetas</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1742,6 +1782,102 @@ function appendLog ({ type, data }) {
 
 function clearLog () {
   document.getElementById('syncLog').innerHTML = '<div class="log-empty">Log limpiado</div>'
+}
+
+function clearCompare () {
+  document.getElementById('compareLog').innerHTML = '<div class="log-empty">Presiona Comparar DB vs Carpetas</div>'
+  document.getElementById('compareActions').innerHTML = ''
+  document.getElementById('sSoloCarpeta').textContent = '—'
+  document.getElementById('sSoloDB').textContent      = '—'
+  document.getElementById('sSoloCarpetaBar').style.width = '0%'
+  document.getElementById('sSoloDBBar').style.width      = '0%'
+}
+
+async function startCompare () {
+  if (!cfg.rutaAretes || !cfg.rutaExcel) {
+    alert('Configura la carpeta de aretes y el Excel primero.')
+    return
+  }
+  const btn = document.getElementById('btnCompare')
+  btn.disabled    = true
+  btn.textContent = '🔍 Comparando...'
+  document.getElementById('compareCard').style.display = 'block'
+  document.getElementById('compareLog').innerHTML = ''
+  document.getElementById('compareActions').innerHTML = ''
+
+  const log = document.getElementById('compareLog')
+  const addLine = (msg, color = 'var(--text2)', icon = '›') => {
+    const div = document.createElement('div')
+    div.style.cssText = `color:${color};padding:1px 0;border-bottom:1px solid rgba(255,255,255,.03);`
+    div.textContent = `${icon} ${msg}`
+    log.appendChild(div)
+    log.scrollTop = log.scrollHeight
+  }
+
+  addLine('Comparando DB / catálogo Excel vs archivos en disco...', 'var(--text2)')
+
+  const result = await api.compareDbCarpetas({ rutaBase: cfg.rutaAretes, rutaExcel: cfg.rutaExcel })
+
+  const total  = result.soloCarpeta.length + result.soloDB.length + result.enAmbos.length
+  const maxVal = Math.max(result.soloCarpeta.length, result.soloDB.length, 1)
+
+  // Actualizar stat cards
+  document.getElementById('sSoloCarpeta').textContent = result.soloCarpeta.length
+  document.getElementById('sSoloDB').textContent      = result.soloDB.length
+  document.getElementById('sSoloCarpetaBar').style.width = Math.round((result.soloCarpeta.length / maxVal) * 100) + '%'
+  document.getElementById('sSoloDBBar').style.width      = Math.round((result.soloDB.length      / maxVal) * 100) + '%'
+
+  addLine('─'.repeat(50), 'var(--border)')
+
+  // Modelos en ambos
+  addLine(`✅ En catálogo y en disco: ${result.enAmbos.length} modelos`, 'var(--ok)', '✓')
+
+  // Solo en carpeta (faltan en catálogo)
+  if (result.soloCarpeta.length) {
+    addLine(`─`.repeat(50), 'var(--border)')
+    addLine(`📁 Solo en carpeta — faltan en catálogo: ${result.soloCarpeta.length}`, '#0969DA', '▶')
+    result.soloCarpeta.forEach(m => addLine(`  ${m.codigo}  (${m.carpeta})`, '#0969DA', '+'))
+
+    // Botón para agregar todos al catálogo
+    const btnAgregar = document.createElement('button')
+    btnAgregar.className = 'btn btn-secondary btn-sm'
+    btnAgregar.textContent = `➕ Agregar ${result.soloCarpeta.length} al catálogo`
+    btnAgregar.onclick = async () => {
+      btnAgregar.disabled = true
+      btnAgregar.textContent = 'Agregando...'
+      const res = await api.agregarACatalogo({ rutaExcel: cfg.rutaExcel, modelos: result.soloCarpeta })
+      addLine(`✅ ${res.agregados} modelos agregados al catálogo Excel`, 'var(--ok)', '✓')
+      await loadCatalogo()
+      btnAgregar.textContent = `✅ ${res.agregados} agregados`
+    }
+    document.getElementById('compareActions').appendChild(btnAgregar)
+  } else {
+    addLine('📁 No hay modelos en carpeta que falten en el catálogo', 'var(--ok)', '✓')
+  }
+
+  // Solo en DB/catálogo (sin archivo en disco)
+  if (result.soloDB.length) {
+    addLine('─'.repeat(50), 'var(--border)')
+    addLine(`🗄 Solo en catálogo — sin archivo en disco: ${result.soloDB.length}`, '#8250DF', '▶')
+    result.soloDB.forEach(m => {
+      const estado = m.archivoExiste ? '⚠ archivo existe pero no renombrado' : '✗ archivo no encontrado'
+      addLine(`  ${m.codigo}  (${m.carpeta})  ${estado}`, m.archivoExiste ? 'var(--warn)' : 'var(--error)', m.archivoExiste ? '⚠' : '✗')
+    })
+  } else {
+    addLine('🗄 Todos los modelos del catálogo tienen su archivo en disco', 'var(--ok)', '✓')
+  }
+
+  // Errores
+  if (result.errores.length) {
+    addLine('─'.repeat(50), 'var(--border)')
+    result.errores.forEach(e => addLine(e, 'var(--error)', '✗'))
+  }
+
+  addLine('─'.repeat(50), 'var(--border)')
+  addLine(`Comparación completada — ${total} modelos analizados`, 'var(--text)')
+
+  btn.disabled    = false
+  btn.textContent = '🔍 Comparar DB vs Carpetas'
 }
 
 async function startSync () {

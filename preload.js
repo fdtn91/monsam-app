@@ -25,7 +25,9 @@ contextBridge.exposeInMainWorld('api', {
   saveConfig:     (cfg)        => ipcRenderer.invoke('save-config',   cfg),
 
   // ── Sincronizar STLs ─────────────────────────────────────
-  sync:           (opts)       => ipcRenderer.invoke('sync',          opts),
+  sync:           (opts)       => ipcRenderer.invoke('sync',                opts),
+  compareDbCarpetas: (opts)    => ipcRenderer.invoke('compare-db-carpetas', opts),
+  agregarACatalogo:  (opts)    => ipcRenderer.invoke('agregar-a-catalogo',  opts),
   onSyncLog:      (cb)         => ipcRenderer.on('sync-log', (_, m)  => cb(m)),
   offSyncLog:     ()           => ipcRenderer.removeAllListeners('sync-log'),
 

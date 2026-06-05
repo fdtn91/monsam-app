@@ -210,7 +210,89 @@ function appendModelToExcel (filePath, carpeta, codigo, f1, f2) {
   } catch { return false }
 }
 
-ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
+// ════════════════════════════════════════════════════════════
+//  COMPARAR DB vs CARPETAS
+// ════════════════════════════════════════════════════════════
+ipcMain.handle('compare-db-carpetas', (_, { rutaBase, rutaExcel }) => {
+  const result = {
+    soloCarpeta: [],   // STLs en carpeta pero no en catálogo/DB
+    soloDB:      [],   // en catálogo/DB pero sin carpeta en disco
+    enAmbos:     [],   // coinciden
+    errores:     []
+  }
+
+  // 1. Leer modelos del catálogo Excel
+  const catalogoSet = new Map() // codigo -> { carpeta, archivo1 }
+  try {
+    const wb = readWB(rutaExcel)
+    if (wb) {
+      const rows = toRows(wb.Sheets[wb.SheetNames[0]])
+      rows.slice(1).forEach(r => {
+        const codigo = String(r[1]||'').trim()
+        const carpeta = String(r[0]||'').trim()
+        const archivo1 = String(r[2]||'').trim()
+        if (codigo && codigo !== 'TOTAL DE PARES')
+          catalogoSet.set(codigo, { carpeta, archivo1 })
+      })
+    }
+  } catch (e) { result.errores.push(`Error leyendo Excel: ${e.message}`) }
+
+  // 2. Escanear carpetas en disco — buscar archivos renombrados (COD_1.stl)
+  const carpetaSet = new Map() // codigo -> { carpeta, archivo1, rutaCompleta }
+  try {
+    if (fs.existsSync(rutaBase)) {
+      const dirs = fs.readdirSync(rutaBase, { withFileTypes: true })
+        .filter(d => d.isDirectory()).map(d => d.name)
+
+      for (const carpeta of dirs) {
+        const cp    = path.join(rutaBase, carpeta)
+        const files = fs.readdirSync(cp).filter(f => f.endsWith('.stl'))
+        // Buscar archivos con patrón prefijo+número_1.stl (ya renombrados)
+        const renombrados = files.filter(f => /^[A-Z]{2,5}\d+_1\.stl$/i.test(f))
+        for (const f of renombrados) {
+          const codigo = f.replace(/_1\.stl$/i, '')
+          carpetaSet.set(codigo, { carpeta, archivo1: f, rutaCompleta: path.join(cp, f) })
+        }
+      }
+    }
+  } catch (e) { result.errores.push(`Error escaneando carpetas: ${e.message}`) }
+
+  // 3. Comparar
+  const todosCodigos = new Set([...catalogoSet.keys(), ...carpetaSet.keys()])
+
+  for (const codigo of todosCodigos) {
+    const enCatalogo = catalogoSet.has(codigo)
+    const enCarpeta  = carpetaSet.has(codigo)
+
+    if (enCatalogo && enCarpeta) {
+      // Verificar que el archivo físico existe
+      const info = carpetaSet.get(codigo)
+      const existe = fs.existsSync(info.rutaCompleta)
+      result.enAmbos.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1, archivoExiste: existe })
+    } else if (enCarpeta && !enCatalogo) {
+      const info = carpetaSet.get(codigo)
+      result.soloCarpeta.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1 })
+    } else if (enCatalogo && !enCarpeta) {
+      const info = catalogoSet.get(codigo)
+      // Verificar si el archivo existe en la ruta del catálogo
+      const rutaStl = path.join(rutaBase, info.carpeta, info.archivo1)
+      const existe  = fs.existsSync(rutaStl)
+      result.soloDB.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1, archivoExiste: existe })
+    }
+  }
+
+  return result
+})
+
+// Agregar modelos faltantes al Excel desde la comparación
+ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
+  let agregados = 0
+  for (const m of modelos) {
+    const ok = appendModelToExcel(rutaExcel, m.carpeta, m.codigo, m.archivo1, m.archivo1.replace('_1.', '_2.'))
+    if (ok) agregados++
+  }
+  return { ok: true, agregados }
+})
   const send  = (type, data) => event.sender.send('sync-log', { type, data })
   const stats = { renombrados:0, agregados:0, advertencias:0, errores:0 }
   if (!fs.existsSync(rutaBase)) { send('error','Carpeta de aretes no encontrada.'); return stats }
