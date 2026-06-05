@@ -350,6 +350,19 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   transition:all .2s; font-family:'Gadugi','Segoe UI',system-ui,sans-serif; font-weight:700;
 }
 .catalogo-upload-btn:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+/* Drag & drop */
+.catalogo-card-img.drag-over{
+  outline: 3px dashed var(--accent);
+  outline-offset: -3px;
+  background: rgba(21,81,36,.08);
+}
+.catalogo-card-img.drag-over::after{
+  content: '📷 Soltar aquí';
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:var(--accent);
+  background:rgba(21,81,36,.08); pointer-events:none;
+}
 
 /* ── MODAL VIEWER 3D ── */
 .viewer-modal{
@@ -1171,7 +1184,10 @@ function renderCatalogo () {
 
   grid.innerHTML = items.map(item => `
     <div class="catalogo-card" onclick="openViewer('${item.codigo}','${item.carpeta}','${item.archivo1}')">
-      <div class="catalogo-card-img" id="thumb-${item.codigo}">
+      <div class="catalogo-card-img" id="thumb-${item.codigo}"
+        ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="event.preventDefault();event.stopPropagation();this.classList.remove('drag-over');handleDropFoto('${item.codigo}',event)">
         <div class="stl-loading">
           <div class="stl-spinner"></div>
         </div>
@@ -1359,12 +1375,19 @@ async function openViewer (codigo, carpeta, archivo1) {
   const foto = await api.getFoto(cfg.rutaAretes, codigo)
   if (foto) {
     document.getElementById('viewerLoading').style.display = 'none'
+    // Ocultar sidebar y expandir imagen al ancho completo
+    document.querySelector('.viewer-body').style.gridTemplateColumns = '1fr'
+    document.querySelector('.viewer-sidebar').style.display = 'none'
+    wrap.style.minHeight = '400px'
     const img = document.createElement('img')
     img.src   = `file:///${foto.replace(/\\/g,'/')}`
-    img.style = 'max-width:100%;max-height:65vh;object-fit:contain;display:block;'
+    img.style = 'max-width:100%;max-height:70vh;object-fit:contain;display:block;'
     wrap.appendChild(img)
     return
   }
+  // Restaurar layout normal para STL
+  document.querySelector('.viewer-body').style.gridTemplateColumns = ''
+  document.querySelector('.viewer-sidebar').style.display = ''
 
   // Cargar STL
   const stlB64 = await api.getStlBase64(cfg.rutaAretes, carpeta, archivo1)
@@ -1457,10 +1480,28 @@ async function subirFotoGrid (codigo) {
   if (!src) return
   const dest = await api.saveFoto(cfg.rutaAretes, codigo, src)
   if (dest) {
-    // Recargar thumbnail
     const item = catalogoItems.find(i => i.codigo === codigo)
     if (item) loadThumb(item)
   }
+}
+
+async function handleDropFoto (codigo, event) {
+  const file = event.dataTransfer.files[0]
+  if (!file) return
+  const ext = file.name.split('.').pop().toLowerCase()
+  if (!['jpg','jpeg','png','webp'].includes(ext)) {
+    alert('Solo se aceptan imágenes JPG, PNG o WEBP.')
+    return
+  }
+  // Guardar usando la ruta del archivo
+  const src  = file.path   // Electron expone file.path en el renderer
+  if (!src) { alert('No se pudo obtener la ruta del archivo.'); return }
+  const dest = await api.saveFoto(cfg.rutaAretes, codigo, src)
+  if (dest) {
+    const item = catalogoItems.find(i => i.codigo === codigo)
+    if (item) loadThumb(item)
+  }
+}
 }
 
 async function subirFotoViewer () {
