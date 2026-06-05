@@ -372,7 +372,8 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 .pedido-card:hover{ border-color:rgba(21,81,36,.3); }
 .pedido-card.estado-pendiente  { border-left:3px solid var(--error); }
 .pedido-card.estado-visto      { border-left:3px solid var(--blue); }
-.pedido-card.estado-en_proceso { border-left:3px solid var(--warn); }
+.pedido-card.estado-en_revision  { border-left:3px solid var(--blue); }
+.pedido-card.estado-en_produccion { border-left:3px solid var(--warn); }
 .pedido-card.estado-listo      { border-left:3px solid var(--ok); }
 .pedido-card.estado-entregado  { border-left:3px solid var(--muted); opacity:.7; }
 .pedido-header{ display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px; }
@@ -393,7 +394,8 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 }
 .estado-chip.pendiente  { background:rgba(207,34,46,.12);  color:var(--error); }
 .estado-chip.visto      { background:rgba(9,105,218,.12);  color:var(--blue); }
-.estado-chip.en_proceso { background:rgba(154,103,0,.12);  color:var(--warn); }
+.estado-chip.en_revision   { background:rgba(9,105,218,.12);   color:var(--blue); }
+.estado-chip.en_produccion { background:rgba(154,103,0,.12);  color:var(--warn); }
 .estado-chip.listo      { background:rgba(26,127,55,.12);  color:var(--ok); }
 .estado-chip.entregado  { background:rgba(140,149,159,.12);color:var(--muted); }
 
@@ -992,6 +994,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
           </div>
           <button class="btn btn-secondary btn-sm" onclick="loadPedidos()">↻ Actualizar</button>
           <button class="btn btn-secondary btn-sm" onclick="marcarTodosVistosP()">✓ Marcar todos vistos</button>
+          <button class="btn btn-primary btn-sm" onclick="agruparPedidos()">⊞ Agrupar pedidos</button>
         </div>
       </div>
       <div class="page-body">
@@ -1005,9 +1008,13 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             <div class="stat-num c-error" id="pStat-pendiente">0</div>
             <div class="stat-lbl">Pendientes</div>
           </div>
-          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('en_proceso')">
-            <div class="stat-num c-warn" id="pStat-en_proceso">0</div>
-            <div class="stat-lbl">En proceso</div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('en_revision')">
+            <div class="stat-num c-accent" id="pStat-en_revision">0</div>
+            <div class="stat-lbl">En revisión</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('en_produccion')">
+            <div class="stat-num c-warn" id="pStat-en_produccion">0</div>
+            <div class="stat-lbl">En producción</div>
           </div>
           <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('listo')">
             <div class="stat-num c-ok" id="pStat-listo">0</div>
@@ -1335,6 +1342,40 @@ tr:hover td{ background:rgba(21,81,36,.04); }
           🖱️ Clic derecho para mover
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: REVISAR PEDIDO
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalRevisarPedido">
+  <div class="modal" style="width:720px;max-width:96vw;">
+    <div class="modal-title" id="modalRevisarTitle">Revisar pedido</div>
+    <div id="modalRevisarContenido" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;max-height:60vh;overflow-y:auto;margin-bottom:16px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalRevisarPedido')">Cerrar</button>
+      <button class="btn btn-warn btn-sm" id="btnRevisarEnRevision" onclick="confirmarRevision()">
+        → Marcar como En revisión
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: AGRUPAR PEDIDOS POR COLOR
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalAgrupar">
+  <div class="modal" style="width:860px;max-width:96vw;max-height:92vh;overflow-y:auto;">
+    <div class="modal-title">Pedidos agrupados por color</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:16px;">
+      Pedidos con estado <strong>Visto</strong> agrupados por color de filamento.
+      Al agregar al queue, el estado cambia a <strong>En producción</strong>.
+    </div>
+    <div id="modalAgruparContenido"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAgrupar')">Cerrar</button>
+      <button class="btn btn-primary" onclick="agregarTodosAlQueue()">🖨 Agregar todo al queue</button>
     </div>
   </div>
 </div>
@@ -3101,6 +3142,191 @@ function showPage (id) {
 let pedidosFiltroActual = 'todos'
 let pedidosData         = []
 
+// ════════════════════════════════════════════════════════════
+//  PEDIDOS — REVISAR
+// ════════════════════════════════════════════════════════════
+let pedidoEnRevisionId = null
+
+async function revisarPedido (id) {
+  pedidoEnRevisionId = id
+  const pedido = pedidosData.find(p => p.id === id)
+  if (!pedido) return
+
+  const fecha  = new Date(pedido.fecha_pedido).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+  document.getElementById('modalRevisarTitle').textContent =
+    `Revisar pedido — ${pedido.cliente || 'Sin nombre'} · ${fecha}`
+
+  const btnRevision = document.getElementById('btnRevisarEnRevision')
+  btnRevision.style.display = pedido.estado === 'visto' ? 'inline-flex' : 'none'
+
+  const contenido = document.getElementById('modalRevisarContenido')
+  contenido.innerHTML = pedido.items.map(item => `
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;text-align:center;">
+      <div style="width:100%;aspect-ratio:1;background:var(--s3);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <img src="" alt="${item.codigo}"
+          style="width:100%;height:100%;object-fit:cover;display:none;"
+          id="prevImg-${item.codigo}"
+          onload="this.style.display='block';document.getElementById('prevPlaceholder-${item.codigo}').style.display='none'"
+          onerror="this.style.display='none'"/>
+        <div id="prevPlaceholder-${item.codigo}" style="font-family:monospace;font-size:12px;font-weight:700;color:var(--accent);">${item.codigo}</div>
+      </div>
+      <div style="padding:8px;">
+        <div style="font-family:monospace;font-size:12px;font-weight:700;color:var(--accent);">${item.codigo}</div>
+        <div style="display:flex;align-items:center;gap:4px;justify-content:center;margin-top:4px;">
+          ${item.color_hex ? `<span style="width:10px;height:10px;border-radius:50%;background:${item.color_hex};border:1px solid var(--border);flex-shrink:0;"></span>` : ''}
+          <span style="font-size:10px;color:var(--text2);">${item.color || ''}</span>
+          <span style="font-size:10px;color:var(--muted);">×${item.pares}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px;"
+          onclick="agregarModeloAlQueue('${item.codigo}')">
+          🖨 Al queue
+        </button>
+      </div>
+    </div>`).join('')
+
+  openModal('modalRevisarPedido')
+
+  for (const item of pedido.items) {
+    const foto = await api.getFoto(cfg.rutaAretes, item.codigo)
+    if (foto) {
+      const img = document.getElementById(`prevImg-${item.codigo}`)
+      if (img) img.src = `file:///${foto.replace(/\\/g,'/')}`
+    }
+  }
+}
+
+async function confirmarRevision () {
+  if (!pedidoEnRevisionId) return
+  await api.setEstadoPedido(pedidoEnRevisionId, 'en_revision')
+  closeModal('modalRevisarPedido')
+  await loadPedidos()
+}
+
+function agregarModeloAlQueue (codigo) {
+  const item = catalogoItems.find(i => i.codigo === codigo)
+  if (!item) { alert(`Modelo ${codigo} no encontrado en el catálogo`); return }
+  const yaEsta = printSeleccion.find(s => s.codigo === codigo)
+  if (yaEsta) { alert(`${codigo} ya está en el queue`); return }
+  const maxModelos = cfg.maxModelosPlaca || 7
+  if (printSeleccion.length >= maxModelos) {
+    alert(`Queue lleno (máx ${maxModelos}). Ve a Imprimir para lanzar la impresión primero.`); return
+  }
+  printSeleccion.push({ codigo, carpeta: item.carpeta, archivo1: item.archivo1 })
+  renderPrintGrid()
+  renderPrintQueue()
+  actualizarBtnCatalogo(codigo)
+  const btn = event.target
+  btn.textContent = '✓ En queue'
+  btn.disabled = true
+  btn.style.color = 'var(--ok)'
+}
+
+// ════════════════════════════════════════════════════════════
+//  PEDIDOS — AGRUPAR POR COLOR
+// ════════════════════════════════════════════════════════════
+let agrupacionActual = []
+
+async function agruparPedidos () {
+  const todos  = await api.getPedidos(null)
+  const vistos = todos.filter(p => p.estado === 'visto')
+
+  if (!vistos.length) {
+    alert('No hay pedidos con estado "Visto" para agrupar.\nPrimero marca los pedidos como vistos.')
+    return
+  }
+
+  const grupos = {}
+  for (const pedido of vistos) {
+    for (const item of (pedido.items || [])) {
+      const key = item.color || 'Sin color'
+      if (!grupos[key]) grupos[key] = { color: key, color_hex: item.color_hex || '#888', modelos: [] }
+      grupos[key].modelos.push({
+        codigo:        item.codigo,
+        pedidoId:      pedido.id,
+        pedidoCliente: pedido.cliente || 'Sin nombre',
+        pares:         item.pares
+      })
+    }
+  }
+
+  agrupacionActual = Object.values(grupos).sort((a, b) => a.color.localeCompare(b.color))
+
+  const contenido = document.getElementById('modalAgruparContenido')
+  contenido.innerHTML = agrupacionActual.map((grupo, gi) => {
+    const modelosUnicos = [...new Set(grupo.modelos.map(m => m.codigo))]
+    const modelosHtml = grupo.modelos.map(m => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+        <span style="font-family:monospace;font-weight:700;color:var(--accent);min-width:50px;">${m.codigo}</span>
+        <span style="color:var(--text2);flex:1;">Pedido #${m.pedidoId} · ${m.pedidoCliente}</span>
+        <span style="color:var(--muted);">${m.pares}p</span>
+      </div>`).join('')
+
+    return `
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="width:18px;height:18px;border-radius:50%;background:${grupo.color_hex};border:2px solid var(--border);flex-shrink:0;"></span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);">${grupo.color}</div>
+          <div style="font-size:10px;color:var(--muted);">${grupo.modelos.length} pieza${grupo.modelos.length!==1?'s':''} · ${modelosUnicos.length} modelo${modelosUnicos.length!==1?'s':''} distintos</div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto;"
+          onclick="agregarGrupoAlQueue(${gi})">
+          🖨 Agregar al queue
+        </button>
+      </div>
+      <div>${modelosHtml}</div>
+    </div>`
+  }).join('')
+
+  openModal('modalAgrupar')
+}
+
+async function agregarGrupoAlQueue (grupoIdx) {
+  const grupo = agrupacionActual[grupoIdx]
+  if (!grupo) return
+
+  const modelosUnicos = [...new Set(grupo.modelos.map(m => m.codigo))]
+  const pedidoIds     = [...new Set(grupo.modelos.map(m => m.pedidoId))]
+  let agregados = 0
+
+  for (const codigo of modelosUnicos) {
+    const item = catalogoItems.find(i => i.codigo === codigo)
+    if (!item) continue
+    if (printSeleccion.find(s => s.codigo === codigo)) continue
+    const maxModelos = cfg.maxModelosPlaca || 7
+    if (printSeleccion.length >= maxModelos) break
+    printSeleccion.push({ codigo, carpeta: item.carpeta, archivo1: item.archivo1 })
+    agregados++
+  }
+
+  for (const id of pedidoIds) {
+    await api.setEstadoPedido(id, 'en_produccion')
+  }
+
+  renderPrintGrid()
+  renderPrintQueue()
+  sincronizarBotonesCatalogo()
+
+  const btn = document.querySelector(`[onclick="agregarGrupoAlQueue(${grupoIdx})"]`)
+  if (btn) { btn.textContent = `✓ ${agregados} en queue`; btn.disabled = true; btn.style.background = 'var(--ok)' }
+
+  await loadPedidos()
+
+  if (agregados > 0) {
+    setTimeout(() => {
+      if (confirm(`✅ ${agregados} modelo(s) agregados al queue.\nPedidos marcados como "En producción".\n\n¿Ir a Imprimir ahora?`)) {
+        showPage('imprimir')
+      }
+    }, 100)
+  }
+}
+
+async function agregarTodosAlQueue () {
+  for (let i = 0; i < agrupacionActual.length; i++) {
+    await agregarGrupoAlQueue(i)
+  }
+}
+
 async function loadPedidos () {
   const filtro = pedidosFiltroActual === 'todos' ? null : { estado: pedidosFiltroActual }
   pedidosData  = await api.getPedidos(filtro)
@@ -3123,11 +3349,12 @@ async function actualizarStatsPedidos () {
   // Cargar todos para los contadores independientemente del filtro
   const todos = await api.getPedidos(null)
   const contar = (e) => todos.filter(p => p.estado === e).length
-  document.getElementById('pStat-todos').textContent      = todos.length
-  document.getElementById('pStat-pendiente').textContent  = contar('pendiente')
-  document.getElementById('pStat-en_proceso').textContent = contar('en_proceso')
-  document.getElementById('pStat-listo').textContent      = contar('listo')
-  document.getElementById('pStat-entregado').textContent  = contar('entregado')
+  document.getElementById('pStat-todos').textContent         = todos.length
+  document.getElementById('pStat-pendiente').textContent     = contar('pendiente')
+  document.getElementById('pStat-en_revision').textContent   = contar('en_revision')
+  document.getElementById('pStat-en_produccion').textContent = contar('en_produccion')
+  document.getElementById('pStat-listo').textContent         = contar('listo')
+  document.getElementById('pStat-entregado').textContent     = contar('entregado')
   // Badge sidebar
   const pendientes = contar('pendiente')
   const badge = document.getElementById('pedidosBadge')
@@ -3144,11 +3371,12 @@ function renderPedidos () {
   }
 
   const ESTADOS = {
-    pendiente:  { label:'Pendiente',  next:'visto' },
-    visto:      { label:'Visto',      next:'en_proceso' },
-    en_proceso: { label:'En proceso', next:'listo' },
-    listo:      { label:'Listo',      next:'entregado' },
-    entregado:  { label:'Entregado',  next:null }
+    pendiente:     { label:'Pendiente',      next:'visto' },
+    visto:         { label:'Visto',          next:'en_revision' },
+    en_revision:   { label:'En revisión',    next:'en_produccion' },
+    en_produccion: { label:'En producción',  next:'listo' },
+    listo:         { label:'Listo',          next:'entregado' },
+    entregado:     { label:'Entregado',      next:null }
   }
 
   lista.innerHTML = pedidosData.map(p => {
@@ -3184,6 +3412,7 @@ function renderPedidos () {
       <div class="pedido-actions">
         ${nextBtn}
         ${est.next ? `<button class="btn btn-secondary btn-sm" onclick="cambiarEstado(${p.id})">Cambiar estado</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="revisarPedido(${p.id})">🔍 Revisar</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarPedido(${p.id})">🗑</button>
       </div>
     </div>`
