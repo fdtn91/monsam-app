@@ -269,11 +269,26 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
 //  monsam ve los filamentos de e500 como "colores"
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('get-colores', () => {
-  return db.prepare(`
-    SELECT id, nombre, nombre as codigo, color_hex as hex, notas as descripcion,
+  // Generar código corto: primeras 3 letras sin espacios + número único
+  const rows = db.prepare(`
+    SELECT id, nombre, color_hex as hex, notas as descripcion,
            stock_gr as stockGr, costo_kg as costoPorKg
     FROM filamentos ORDER BY nombre
   `).all()
+
+  const usedCodes = new Set()
+  return rows.map(r => {
+    // Extraer palabras relevantes para el código (ignorar tipo de filamento)
+    const palabras = r.nombre
+      .replace(/\b(PLA|PETG|ABS|TPU|ASA|NYLON|SILK|WOOD|METAL)\b/gi, '')
+      .trim().split(/\s+/).filter(Boolean)
+    const base = palabras.map(p => p.replace(/[^a-zA-Z]/g,'').substring(0,2)).join('').substring(0,4).toUpperCase() || 'COL'
+    let n = 1
+    while (usedCodes.has(`${base}${n}`)) n++
+    const codigo = `${base}${n}`
+    usedCodes.add(codigo)
+    return { ...r, codigo }
+  })
 })
 
 ipcMain.handle('save-color', (_, __, color) => {
@@ -303,6 +318,14 @@ ipcMain.handle('save-color', (_, __, color) => {
 ipcMain.handle('delete-color', (_, __, nombre) => {
   db.prepare('DELETE FROM filamentos WHERE nombre=?').run(nombre)
   return true
+})
+
+// Refrescar stock desde la DB compartida (para sincronización en tiempo real)
+ipcMain.handle('refresh-stock', () => {
+  return db.prepare(`
+    SELECT nombre, stock_gr as stockGr, updated_at
+    FROM filamentos ORDER BY nombre
+  `).all()
 })
 
 // ════════════════════════════════════════════════════════════

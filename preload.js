@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
   saveColor:           (p,c) => ipcRenderer.invoke('save-color',           p, c),
   deleteColor:         (p,n) => ipcRenderer.invoke('delete-color',         p, n),
   getCatalogoCodigos:  (p)   => ipcRenderer.invoke('get-catalogo-codigos', p),
+  refreshStock:        ()    => ipcRenderer.invoke('refresh-stock'),
 
   // ── Inventario ───────────────────────────────────────────
   getInventario:  (p)          => ipcRenderer.invoke('get-inventario',   p),

@@ -1117,14 +1117,6 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 // ════════════════════════════════════════════════════════════
 //  CATÁLOGO
 // ════════════════════════════════════════════════════════════
-let catalogoItems    = []
-let catFiltroActual  = 'Todos'
-let catVistaActual   = '3d'   // '3d' | 'foto'
-let viewerData       = null
-let threeRenderer    = null
-let threeScene       = null
-let threeCamera      = null
-let threeAnimId      = null
 
 async function loadCatalogo () {
   catalogoItems = await api.getCatalogoCompleto(cfg.rutaExcel)
@@ -1509,9 +1501,7 @@ async function subirFotoViewer () {
   // Reabrir el visor con la foto nueva
   openViewer(viewerData.codigo, viewerData.carpeta, viewerData.archivo1)
 }
-</script>
 
-<script>
 // ════════════════════════════════════════════════════════════
 //  ESTADO GLOBAL
 // ════════════════════════════════════════════════════════════
@@ -1524,6 +1514,15 @@ let cliTabActual = 'directo'
 let gcodeActual  = null
 let costoActual  = null
 let skuDescontar = null
+// ── Catálogo ──────────────────────────────────────────────
+let catalogoItems   = []
+let catFiltroActual = 'Todos'
+let catVistaActual  = '3d'
+let viewerData      = null
+let threeRenderer   = null
+let threeScene      = null
+let threeCamera     = null
+let threeAnimId     = null
 
 // ════════════════════════════════════════════════════════════
 //  INIT
@@ -1538,6 +1537,23 @@ async function init () {
   await loadCatalogoCodigos()
   await loadCatalogo()
   populateColorSelects()
+  // Polling de stock cada 10 segundos para sincronización con e500-app
+  setInterval(async () => {
+    const stocks = await api.refreshStock()
+    if (!stocks || !stocks.length) return
+    let cambio = false
+    stocks.forEach(s => {
+      const c = colores.find(x => x.nombre === s.nombre)
+      if (c && c.stockGr !== s.stockGr) {
+        c.stockGr = s.stockGr
+        cambio = true
+      }
+    })
+    if (cambio) {
+      renderColores()
+      populateColorSelects()
+    }
+  }, 10000)
 }
 init()
 
