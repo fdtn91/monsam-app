@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   // ── Catálogo / Fotos / STL ───────────────────────────────────────────────
   selectFoto:          (def)          => ipcRenderer.invoke('select-foto',           def),
   saveFoto:            (ra, cod, src) => ipcRenderer.invoke('save-foto',             ra, cod, src),
+  savePreviewSTL:      (ra, cod, url) => ipcRenderer.invoke('save-preview-stl',      ra, cod, url),
   getFoto:             (ra, cod)      => ipcRenderer.invoke('get-foto',              ra, cod),
   getStlBase64:        (ra, car, arc) => ipcRenderer.invoke('get-stl-base64',        ra, car, arc),
   getCatalogoCompleto: (p)            => ipcRenderer.invoke('get-catalogo-completo', p),

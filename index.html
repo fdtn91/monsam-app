@@ -1509,7 +1509,7 @@ async function loadThumb (item) {
     return
   }
 
-  const imgEl = renderSTLThumb(stlB64, 160, 160)
+  const imgEl = renderSTLThumb(stlB64, 400, 400)
   container.innerHTML = ''
   container.appendChild(imgEl)
   const btn = document.createElement('button')
@@ -1517,6 +1517,26 @@ async function loadThumb (item) {
   btn.textContent = '📷'
   btn.onclick = (e) => { e.stopPropagation(); subirFotoGrid(item.codigo) }
   container.appendChild(btn)
+
+  // Auto-guardar preview frontal como foto para la app móvil
+  // Solo si el modelo no tenía foto previa
+  autoGuardarPreviewSTL(item.codigo, imgEl.src)
+}
+
+async function autoGuardarPreviewSTL (codigo, dataUrl) {
+  // Evitar guardar múltiples veces
+  if (!dataUrl || !dataUrl.startsWith('data:image')) return
+  try {
+    // Convertir dataUrl a blob y guardar via IPC
+    const res = await api.savePreviewSTL(cfg.rutaAretes, codigo, dataUrl)
+    if (res) {
+      // Actualizar tieneFoto en catalogoItems para la API
+      const item = catalogoItems.find(i => i.codigo === codigo)
+      if (item) item.tieneFoto = true
+    }
+  } catch (e) {
+    // Silencioso — no es crítico
+  }
 }
 
 function renderSTLThumb (base64, w, h) {

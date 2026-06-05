@@ -340,6 +340,24 @@ ipcMain.handle('save-foto', async (_, rutaAretes, codigo, srcPath) => {
   } catch { return null }
 })
 
+// Guardar preview STL generada desde canvas (dataUrl base64)
+ipcMain.handle('save-preview-stl', async (_, rutaAretes, codigo, dataUrl) => {
+  try {
+    // Solo guardar si no existe foto real
+    const fotosDir = path.join(rutaAretes, 'fotos')
+    for (const ext of ['.jpg','.jpeg','.png','.webp']) {
+      if (fs.existsSync(path.join(fotosDir, `${codigo}${ext}`))) return false // ya tiene foto
+    }
+    if (!fs.existsSync(fotosDir)) fs.mkdirSync(fotosDir)
+    // dataUrl = "data:image/png;base64,..."
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '')
+    const buffer = Buffer.from(base64, 'base64')
+    const dest   = path.join(fotosDir, `${codigo}.png`)
+    fs.writeFileSync(dest, buffer)
+    return dest
+  } catch { return null }
+})
+
 ipcMain.handle('get-foto', (_, rutaAretes, codigo) => {
   const fotosDir = path.join(rutaAretes, 'fotos')
   for (const ext of ['.jpg','.jpeg','.png','.webp']) {
