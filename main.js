@@ -269,20 +269,26 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
 //  monsam ve los filamentos de e500 como "colores"
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('get-colores', () => {
-  // Generar código corto: primeras 3 letras sin espacios + número único
   const rows = db.prepare(`
     SELECT id, nombre, color_hex as hex, notas as descripcion,
            stock_gr as stockGr, costo_kg as costoPorKg
     FROM filamentos ORDER BY nombre
   `).all()
 
+  // Palabras a ignorar: tipos de material y marcas comunes
+  const IGNORAR = /\b(PLA|PETG|ABS|TPU|ASA|NYLON|SILK|WOOD|METAL|SUNLU|ESUN|BAMBU|CREALITY|HATCHBOX|POLYMAKER|PRUSAMENT|BASICFIL|MEXICOMAKERS|MATTE|PLUS|PRO|MAX|LITE|BASIC)\b/gi
+
   const usedCodes = new Set()
   return rows.map(r => {
-    // Extraer palabras relevantes para el código (ignorar tipo de filamento)
-    const palabras = r.nombre
-      .replace(/\b(PLA|PETG|ABS|TPU|ASA|NYLON|SILK|WOOD|METAL)\b/gi, '')
-      .trim().split(/\s+/).filter(Boolean)
-    const base = palabras.map(p => p.replace(/[^a-zA-Z]/g,'').substring(0,2)).join('').substring(0,4).toUpperCase() || 'COL'
+    // Eliminar tipo y marca, tomar primera palabra del color puro
+    const colorPuro = r.nombre
+      .replace(IGNORAR, '')
+      .trim()
+      .split(/\s+/)
+      .find(p => p.replace(/[^a-zA-Z]/g,'').length >= 2) || 'COL'
+
+    const base = colorPuro.replace(/[^a-zA-Z]/g,'').substring(0, 3).toUpperCase()
+
     let n = 1
     while (usedCodes.has(`${base}${n}`)) n++
     const codigo = `${base}${n}`
