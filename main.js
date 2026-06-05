@@ -238,7 +238,7 @@ function startApiServer () {
         const id = parseInt(route.split('/')[3])
         bodyJSON().then(body => {
           const { estado } = body
-          const valid = ['pendiente','visto','en_proceso','listo','entregado']
+          const valid = ['pendiente','visto','en_revision','en_produccion','listo','entregado']
           if (!valid.includes(estado)) return json({ ok: false, error: 'estado inválido' }, 400)
           db.prepare('UPDATE pedidos SET estado=? WHERE id=?').run(estado, id)
           return json({ ok: true })
@@ -272,7 +272,7 @@ ipcMain.handle('get-pedidos', (_, filtro) => {
 })
 
 ipcMain.handle('set-estado-pedido', (_, id, estado) => {
-  const valid = ['pendiente','visto','en_proceso','listo','entregado']
+  const valid = ['pendiente','visto','en_revision','en_produccion','listo','entregado']
   if (!valid.includes(estado)) return { ok: false, error: 'estado inválido' }
   db.prepare('UPDATE pedidos SET estado=? WHERE id=?').run(estado, id)
   return { ok: true }
