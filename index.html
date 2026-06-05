@@ -363,9 +363,42 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   font-size:12px; font-weight:700; color:var(--accent);
   background:rgba(21,81,36,.08); pointer-events:none;
 }
+/* ── Cards de pedidos ── */
+.pedido-card{
+  background:var(--s1); border:1px solid var(--border); border-radius:10px;
+  padding:16px; margin-bottom:12px; transition:border-color .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.pedido-card:hover{ border-color:rgba(21,81,36,.3); }
+.pedido-card.estado-pendiente  { border-left:3px solid var(--error); }
+.pedido-card.estado-visto      { border-left:3px solid var(--blue); }
+.pedido-card.estado-en_proceso { border-left:3px solid var(--warn); }
+.pedido-card.estado-listo      { border-left:3px solid var(--ok); }
+.pedido-card.estado-entregado  { border-left:3px solid var(--muted); opacity:.7; }
+.pedido-header{ display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px; }
+.pedido-cliente{ font-size:14px;font-weight:700;color:var(--text); }
+.pedido-fecha{ font-size:10px;color:var(--muted);font-family:monospace; }
+.pedido-items{ display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px; }
+.pedido-item-chip{
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:6px; padding:5px 10px; font-size:11px;
+  display:flex; align-items:center; gap:6px;
+}
+.pedido-notas{ font-size:11px;color:var(--text2);font-style:italic;margin-bottom:10px; }
+.pedido-actions{ display:flex;gap:6px;flex-wrap:wrap; }
+.estado-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.estado-chip.pendiente  { background:rgba(207,34,46,.12);  color:var(--error); }
+.estado-chip.visto      { background:rgba(9,105,218,.12);  color:var(--blue); }
+.estado-chip.en_proceso { background:rgba(154,103,0,.12);  color:var(--warn); }
+.estado-chip.listo      { background:rgba(26,127,55,.12);  color:var(--ok); }
+.estado-chip.entregado  { background:rgba(140,149,159,.12);color:var(--muted); }
+
 /* ── Marcador de modelo nuevo ── */
-.nuevo-badge{
-  position:absolute; top:7px; left:7px; z-index:10;
+.nuevo-badge{  position:absolute; top:7px; left:7px; z-index:10;
   width:12px; height:12px; border-radius:50%;
   background:var(--error);
   box-shadow: 0 0 0 2px rgba(207,34,46,.3), 0 0 10px 3px rgba(207,34,46,.5);
@@ -484,6 +517,13 @@ tr:hover td{ background:rgba(21,81,36,.04); }
     <button class="nav-btn" onclick="showPage('costos')" id="nav-costos">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
       Costos
+    </button>
+    <button class="nav-btn" onclick="showPage('pedidos')" id="nav-pedidos" style="position:relative;">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+      Pedidos
+      <span id="pedidosBadge" style="display:none;position:absolute;top:6px;right:8px;
+        width:8px;height:8px;border-radius:50%;background:var(--error);
+        box-shadow:0 0 6px var(--error);"></span>
     </button>
     <button class="nav-btn" onclick="showPage('config')" id="nav-config">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
@@ -931,6 +971,57 @@ tr:hover td{ background:rgba(21,81,36,.04); }
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: PEDIDOS
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-pedidos">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Pedidos</div>
+          <div class="page-sub">Pedidos recibidos desde la app móvil</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="pedidosConexion" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);">
+            <span class="live-dot" id="pedidosLiveDot"></span>
+            <span id="pedidosIpText">—</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadPedidos()">↻ Actualizar</button>
+          <button class="btn btn-secondary btn-sm" onclick="marcarTodosVistosP()">✓ Marcar todos vistos</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <!-- Stats rápidas -->
+        <div class="stats-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('todos')">
+            <div class="stat-num c-accent" id="pStat-todos">0</div>
+            <div class="stat-lbl">Total</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('pendiente')">
+            <div class="stat-num c-error" id="pStat-pendiente">0</div>
+            <div class="stat-lbl">Pendientes</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('en_proceso')">
+            <div class="stat-num c-warn" id="pStat-en_proceso">0</div>
+            <div class="stat-lbl">En proceso</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('listo')">
+            <div class="stat-num c-ok" id="pStat-listo">0</div>
+            <div class="stat-lbl">Listos</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filtrarPedidos('entregado')">
+            <div class="stat-num" style="color:var(--muted)" id="pStat-entregado">0</div>
+            <div class="stat-lbl">Entregados</div>
+          </div>
+        </div>
+        <!-- Lista de pedidos -->
+        <div id="pedidosLista">
+          <div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;">
+            Sin pedidos recibidos aún
           </div>
         </div>
       </div>
@@ -1751,6 +1842,9 @@ async function init () {
       populateColorSelects()
     }
   }, 10000)
+  // Cargar stats de pedidos y conexión al arrancar
+  actualizarStatsPedidos()
+  actualizarInfoConexion()
 }
 init()
 
@@ -2941,20 +3035,164 @@ function showPage (id) {
   _showPageBase(id)
 
   if (id === 'imprimir') {
-    // Inicializar color select con los colores disponibles
     const sel = document.getElementById('printColor')
     const cur = sel.value
     sel.innerHTML = '<option value="">-- selecciona color --</option>'
     colores.forEach(c => sel.innerHTML +=
       `<option value="${c.codigo}"${c.codigo===cur?' selected':''}>${c.nombre} (${c.codigo})</option>`)
-    // ZOffset por defecto
     document.getElementById('printZOffset').value = cfg.zOffset || 0.190
-    // Renderizar grid si ya hay modelos
     if (catalogoItems.length) renderPrintGrid()
-    // Verificar estado impresora
     refreshPrinterStatus()
   }
+  if (id === 'pedidos') {
+    loadPedidos()
+    actualizarInfoConexion()
+  }
 }
+
+// ════════════════════════════════════════════════════════════
+//  PEDIDOS
+// ════════════════════════════════════════════════════════════
+let pedidosFiltroActual = 'todos'
+let pedidosData         = []
+
+async function loadPedidos () {
+  const filtro = pedidosFiltroActual === 'todos' ? null : { estado: pedidosFiltroActual }
+  pedidosData  = await api.getPedidos(filtro)
+  renderPedidos()
+  actualizarStatsPedidos()
+}
+
+function filtrarPedidos (estado) {
+  pedidosFiltroActual = estado
+  loadPedidos()
+}
+
+async function marcarTodosVistosP () {
+  const pendientes = pedidosData.filter(p => p.estado === 'pendiente')
+  for (const p of pendientes) await api.setEstadoPedido(p.id, 'visto')
+  await loadPedidos()
+}
+
+async function actualizarStatsPedidos () {
+  // Cargar todos para los contadores independientemente del filtro
+  const todos = await api.getPedidos(null)
+  const contar = (e) => todos.filter(p => p.estado === e).length
+  document.getElementById('pStat-todos').textContent      = todos.length
+  document.getElementById('pStat-pendiente').textContent  = contar('pendiente')
+  document.getElementById('pStat-en_proceso').textContent = contar('en_proceso')
+  document.getElementById('pStat-listo').textContent      = contar('listo')
+  document.getElementById('pStat-entregado').textContent  = contar('entregado')
+  // Badge sidebar
+  const pendientes = contar('pendiente')
+  const badge = document.getElementById('pedidosBadge')
+  if (badge) badge.style.display = pendientes > 0 ? 'block' : 'none'
+}
+
+function renderPedidos () {
+  const lista = document.getElementById('pedidosLista')
+  if (!pedidosData.length) {
+    lista.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;">
+      Sin pedidos ${pedidosFiltroActual !== 'todos' ? 'con estado "'+pedidosFiltroActual+'"' : 'recibidos aún'}
+    </div>`
+    return
+  }
+
+  const ESTADOS = {
+    pendiente:  { label:'Pendiente',  next:'visto' },
+    visto:      { label:'Visto',      next:'en_proceso' },
+    en_proceso: { label:'En proceso', next:'listo' },
+    listo:      { label:'Listo',      next:'entregado' },
+    entregado:  { label:'Entregado',  next:null }
+  }
+
+  lista.innerHTML = pedidosData.map(p => {
+    const est     = ESTADOS[p.estado] || ESTADOS.pendiente
+    const fecha   = new Date(p.fecha_pedido).toLocaleString('es-MX', {
+      day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
+    })
+    const itemsHtml = p.items.map(item => `
+      <div class="pedido-item-chip">
+        ${item.color_hex ? `<span style="width:10px;height:10px;border-radius:50%;background:${item.color_hex};flex-shrink:0;border:1px solid var(--border);"></span>` : ''}
+        <span style="font-family:monospace;font-weight:700;color:var(--accent);">${item.codigo}</span>
+        <span style="color:var(--text2)">${item.color || ''}</span>
+        <span style="color:var(--muted)">×${item.pares}</span>
+      </div>`).join('')
+
+    const nextBtn = est.next
+      ? `<button class="btn btn-primary btn-sm" onclick="avanzarEstado(${p.id},'${est.next}')">
+           → ${ESTADOS[est.next].label}
+         </button>`
+      : ''
+
+    return `
+    <div class="pedido-card estado-${p.estado}" id="pedido-${p.id}">
+      <div class="pedido-header">
+        <div>
+          <div class="pedido-cliente">👤 ${p.cliente || 'Sin nombre'}</div>
+          <div class="pedido-fecha">${fecha}</div>
+        </div>
+        <span class="estado-chip ${p.estado}">${est.label}</span>
+      </div>
+      ${p.notas ? `<div class="pedido-notas">💬 ${p.notas}</div>` : ''}
+      <div class="pedido-items">${itemsHtml}</div>
+      <div class="pedido-actions">
+        ${nextBtn}
+        ${est.next ? `<button class="btn btn-secondary btn-sm" onclick="cambiarEstado(${p.id})">Cambiar estado</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="eliminarPedido(${p.id})">🗑</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+async function avanzarEstado (id, nuevoEstado) {
+  await api.setEstadoPedido(id, nuevoEstado)
+  await loadPedidos()
+}
+
+async function cambiarEstado (id) {
+  const estados = ['pendiente','visto','en_proceso','listo','entregado']
+  const labels  = ['Pendiente','Visto','En proceso','Listo','Entregado']
+  const actual  = pedidosData.find(p => p.id === id)?.estado || 'pendiente'
+  const opciones = estados.map((e,i) => `${e === actual ? '→ ' : '  '}${labels[i]}`).join('\n')
+  const input   = prompt(`Estado actual: ${actual}\n\nElige estado:\n${opciones}\n\nEscribe el estado:`)
+  if (input && estados.includes(input.trim())) {
+    await api.setEstadoPedido(id, input.trim())
+    await loadPedidos()
+  }
+}
+
+async function eliminarPedido (id) {
+  if (!confirm('¿Eliminar este pedido?')) return
+  await api.deletePedido(id)
+  await loadPedidos()
+}
+
+async function actualizarInfoConexion () {
+  try {
+    const ip   = await api.getLocalIP()
+    const port = await api.getApiPort()
+    const url  = `http://${ip}:${port}`
+    const dot  = document.getElementById('pedidosLiveDot')
+    const txt  = document.getElementById('pedidosIpText')
+    if (dot) { dot.classList.add('on') }
+    if (txt) txt.textContent = url
+    // También actualizar en config
+    const cfgIp  = document.getElementById('cfgLocalIp')
+    const cfgUrl = document.getElementById('cfgApiUrl')
+    if (cfgIp)  cfgIp.textContent  = ip
+    if (cfgUrl) cfgUrl.textContent = url
+  } catch (e) { console.error('Error obteniendo IP:', e) }
+}
+
+// Escuchar pedidos nuevos en tiempo real
+api.onPedidoNuevo(() => {
+  actualizarStatsPedidos()
+  // Si estamos en la página de pedidos, recargar
+  if (document.getElementById('page-pedidos')?.classList.contains('active')) {
+    loadPedidos()
+  }
+})
 </script>
 </body>
 </html>
