@@ -32,6 +32,15 @@ function initDB () {
   const migrated = migrateFromExcel(db, cfg)
   const total = Object.values(migrated).reduce((a, b) => a + b, 0)
   if (total > 0) console.log('Migración desde Excel completada:', migrated)
+  // Migraciones incrementales — tablas que pueden no existir en DB antiguas
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS modelos_nuevos (
+      codigo    TEXT PRIMARY KEY,
+      carpeta   TEXT DEFAULT '',
+      archivo1  TEXT DEFAULT '',
+      added_at  TEXT DEFAULT (datetime('now','localtime'))
+    );
+  `)
   return db
 }
 
