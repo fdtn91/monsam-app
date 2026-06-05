@@ -1357,11 +1357,15 @@ async function openViewer (codigo, carpeta, archivo1) {
 
   openModal('modalViewer')
 
-  // Limpiar renderer anterior
+  // Limpiar renderer e imágenes anteriores
   if (threeRenderer) { threeRenderer.dispose(); threeRenderer = null }
   if (threeAnimId)   { cancelAnimationFrame(threeAnimId); threeAnimId = null }
   const wrap = document.getElementById('viewerCanvasWrap')
   wrap.querySelectorAll('canvas').forEach(c => c.remove())
+  wrap.querySelectorAll('img').forEach(i => i.remove())
+  // Restaurar layout normal por defecto
+  document.querySelector('.viewer-body').style.gridTemplateColumns = ''
+  document.querySelector('.viewer-sidebar').style.display = ''
 
   // Verificar foto real primero
   const foto = await api.getFoto(cfg.rutaAretes, codigo)
