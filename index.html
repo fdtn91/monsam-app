@@ -3226,6 +3226,42 @@ function agregarModeloAlQueue (codigo) {
 // ════════════════════════════════════════════════════════════
 let agrupacionActual = []
 
+// Divide los modelos de un grupo en placas respetando el límite de pares por placa
+function calcularPlacas (modelos, maxPares) {
+  const placas  = []
+  let placa     = []
+  let paresPlaca = 0
+
+  for (const modelo of modelos) {
+    let paresRestantes = modelo.pares
+
+    while (paresRestantes > 0) {
+      const caben = maxPares - paresPlaca
+
+      if (caben <= 0) {
+        // Placa llena — guardar y abrir nueva
+        placas.push(placa)
+        placa      = []
+        paresPlaca = 0
+      } else {
+        const enEstaPlaca = Math.min(paresRestantes, caben)
+        // Buscar si el modelo ya está en la placa actual
+        const existente = placa.find(m => m.codigo === modelo.codigo)
+        if (existente) {
+          existente.pares += enEstaPlaca
+        } else {
+          placa.push({ ...modelo, pares: enEstaPlaca })
+        }
+        paresPlaca    += enEstaPlaca
+        paresRestantes -= enEstaPlaca
+      }
+    }
+  }
+
+  if (placa.length > 0) placas.push(placa)
+  return placas
+}
+
 async function agruparPedidos () {
   const todos  = await api.getPedidos(null)
   const vistos = todos.filter(p => p.estado === 'visto')
@@ -3235,31 +3271,61 @@ async function agruparPedidos () {
     return
   }
 
+  const maxPares = cfg.maxModelosPlaca || 7
+
+  // Agrupar por color
   const grupos = {}
   for (const pedido of vistos) {
     for (const item of (pedido.items || [])) {
       const key = item.color || 'Sin color'
-      if (!grupos[key]) grupos[key] = { color: key, color_hex: item.color_hex || '#888', modelos: [] }
+      if (!grupos[key]) grupos[key] = { color: key, color_hex: item.color_hex || '#888', modelos: [], pedidoIds: new Set() }
       grupos[key].modelos.push({
         codigo:        item.codigo,
         pedidoId:      pedido.id,
         pedidoCliente: pedido.cliente || 'Sin nombre',
         pares:         item.pares
       })
+      grupos[key].pedidoIds.add(pedido.id)
     }
   }
 
-  agrupacionActual = Object.values(grupos).sort((a, b) => a.color.localeCompare(b.color))
+  // Calcular placas para cada grupo
+  agrupacionActual = Object.values(grupos)
+    .sort((a, b) => a.color.localeCompare(b.color))
+    .map(g => ({
+      ...g,
+      pedidoIds: [...g.pedidoIds],
+      placas: calcularPlacas(g.modelos, maxPares)
+    }))
 
+  // Renderizar modal
   const contenido = document.getElementById('modalAgruparContenido')
   contenido.innerHTML = agrupacionActual.map((grupo, gi) => {
-    const modelosUnicos = [...new Set(grupo.modelos.map(m => m.codigo))]
-    const modelosHtml = grupo.modelos.map(m => `
-      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
-        <span style="font-family:monospace;font-weight:700;color:var(--accent);min-width:50px;">${m.codigo}</span>
-        <span style="color:var(--text2);flex:1;">Pedido #${m.pedidoId} · ${m.pedidoCliente}</span>
-        <span style="color:var(--muted);">${m.pares}p</span>
-      </div>`).join('')
+    const totalPares = grupo.modelos.reduce((s, m) => s + m.pares, 0)
+
+    const placasHtml = grupo.placas.map((placa, pi) => {
+      const paresPlaca = placa.reduce((s, m) => s + m.pares, 0)
+      const modelosHtml = placa.map(m => `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;">
+          <span style="font-family:monospace;font-weight:700;color:var(--accent);min-width:50px;">${m.codigo}</span>
+          <span style="color:var(--text2);flex:1;">Pedido #${m.pedidoId} · ${m.pedidoCliente}</span>
+          <span style="color:var(--muted);font-weight:700;">${m.pares}p</span>
+        </div>`).join('')
+
+      return `
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">
+            Placa ${pi + 1} — ${paresPlaca}/${maxPares} pares
+          </span>
+          <button class="btn btn-primary btn-sm" id="btnPlaca-${gi}-${pi}"
+            onclick="agregarPlacaAlQueue(${gi}, ${pi})">
+            🖨 Al queue
+          </button>
+        </div>
+        <div style="background:var(--s1);border-radius:6px;padding:6px 8px;">${modelosHtml}</div>
+      </div>`
+    }).join('')
 
     return `
     <div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
@@ -3267,63 +3333,81 @@ async function agruparPedidos () {
         <span style="width:18px;height:18px;border-radius:50%;background:${grupo.color_hex};border:2px solid var(--border);flex-shrink:0;"></span>
         <div>
           <div style="font-size:13px;font-weight:700;color:var(--text);">${grupo.color}</div>
-          <div style="font-size:10px;color:var(--muted);">${grupo.modelos.length} pieza${grupo.modelos.length!==1?'s':''} · ${modelosUnicos.length} modelo${modelosUnicos.length!==1?'s':''} distintos</div>
+          <div style="font-size:10px;color:var(--muted);">
+            ${totalPares} pares totales · ${grupo.placas.length} placa${grupo.placas.length !== 1 ? 's' : ''}
+          </div>
         </div>
-        <button class="btn btn-primary btn-sm" style="margin-left:auto;"
-          onclick="agregarGrupoAlQueue(${gi})">
-          🖨 Agregar al queue
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto;"
+          onclick="agregarTodasPlacasGrupo(${gi})">
+          🖨 Todas las placas
         </button>
       </div>
-      <div>${modelosHtml}</div>
+      ${placasHtml}
     </div>`
   }).join('')
 
   openModal('modalAgrupar')
 }
 
-async function agregarGrupoAlQueue (grupoIdx) {
+// Agrega una placa específica al queue y cambia estado de pedidos a en_produccion
+async function agregarPlacaAlQueue (grupoIdx, placaIdx) {
   const grupo = agrupacionActual[grupoIdx]
   if (!grupo) return
+  const placa = grupo.placas[placaIdx]
+  if (!placa) return
 
-  const modelosUnicos = [...new Set(grupo.modelos.map(m => m.codigo))]
-  const pedidoIds     = [...new Set(grupo.modelos.map(m => m.pedidoId))]
+  // Limpiar queue actual para esta placa (mismo color)
+  printSeleccion = []
+
   let agregados = 0
-
-  for (const codigo of modelosUnicos) {
-    const item = catalogoItems.find(i => i.codigo === codigo)
+  for (const modelo of placa) {
+    const item = catalogoItems.find(i => i.codigo === modelo.codigo)
     if (!item) continue
-    if (printSeleccion.find(s => s.codigo === codigo)) continue
-    const maxModelos = cfg.maxModelosPlaca || 7
-    if (printSeleccion.length >= maxModelos) break
-    printSeleccion.push({ codigo, carpeta: item.carpeta, archivo1: item.archivo1 })
+    if (printSeleccion.find(s => s.codigo === modelo.codigo)) continue
+    printSeleccion.push({ codigo: modelo.codigo, carpeta: item.carpeta, archivo1: item.archivo1 })
     agregados++
   }
 
-  for (const id of pedidoIds) {
+  // Cambiar estado de los pedidos involucrados
+  for (const id of grupo.pedidoIds) {
     await api.setEstadoPedido(id, 'en_produccion')
   }
 
   renderPrintGrid()
   renderPrintQueue()
   sincronizarBotonesCatalogo()
-
-  const btn = document.querySelector(`[onclick="agregarGrupoAlQueue(${grupoIdx})"]`)
-  if (btn) { btn.textContent = `✓ ${agregados} en queue`; btn.disabled = true; btn.style.background = 'var(--ok)' }
-
   await loadPedidos()
+
+  // Feedback en el botón
+  const btn = document.getElementById(`btnPlaca-${grupoIdx}-${placaIdx}`)
+  if (btn) { btn.textContent = `✓ En queue`; btn.disabled = true; btn.style.background = 'var(--ok)' }
 
   if (agregados > 0) {
     setTimeout(() => {
-      if (confirm(`✅ ${agregados} modelo(s) agregados al queue.\nPedidos marcados como "En producción".\n\n¿Ir a Imprimir ahora?`)) {
+      if (confirm(`✅ Placa ${placaIdx + 1} del color "${grupo.color}" agregada al queue.\n${agregados} modelos listos.\n\n¿Ir a Imprimir ahora?`)) {
+        closeModal('modalAgrupar')
         showPage('imprimir')
       }
     }, 100)
   }
 }
 
+async function agregarTodasPlacasGrupo (grupoIdx) {
+  const grupo = agrupacionActual[grupoIdx]
+  if (!grupo) return
+  // Agregar solo la primera placa pendiente
+  for (let pi = 0; pi < grupo.placas.length; pi++) {
+    const btn = document.getElementById(`btnPlaca-${grupoIdx}-${pi}`)
+    if (btn && !btn.disabled) {
+      await agregarPlacaAlQueue(grupoIdx, pi)
+      return // Solo una placa a la vez — el usuario debe imprimir y volver
+    }
+  }
+}
+
 async function agregarTodosAlQueue () {
   for (let i = 0; i < agrupacionActual.length; i++) {
-    await agregarGrupoAlQueue(i)
+    await agregarTodasPlacasGrupo(i)
   }
 }
 
