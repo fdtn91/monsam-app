@@ -363,6 +363,19 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   font-size:12px; font-weight:700; color:var(--accent);
   background:rgba(21,81,36,.08); pointer-events:none;
 }
+/* ── Marcador de modelo nuevo ── */
+.nuevo-badge{
+  position:absolute; top:7px; left:7px; z-index:10;
+  width:12px; height:12px; border-radius:50%;
+  background:var(--error);
+  box-shadow: 0 0 0 2px rgba(207,34,46,.3), 0 0 10px 3px rgba(207,34,46,.5);
+  animation: nuevoPulse 1.8s ease infinite;
+  cursor:pointer;
+}
+@keyframes nuevoPulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(207,34,46,.3), 0 0 10px 3px rgba(207,34,46,.5); }
+  50%      { box-shadow: 0 0 0 4px rgba(207,34,46,.15), 0 0 18px 6px rgba(207,34,46,.35); }
+}
 
 /* ── MODAL VIEWER 3D ── */
 .viewer-modal{
@@ -509,6 +522,8 @@ tr:hover td{ background:rgba(21,81,36,.04); }
               📷 Foto
             </button>
           </div>
+          <button id="btnMarcarTodos" onclick="marcarTodosVistos()" style="display:none;"
+            class="btn btn-secondary btn-sm">✓ Marcar todos como vistos</button>
           <input type="text" id="catBuscar" placeholder="Buscar código..." oninput="filtrarCatalogo()"
             style="background:var(--s2);border:1px solid var(--border);border-radius:6px;
                    padding:7px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;
@@ -1217,6 +1232,35 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 //  CATÁLOGO
 // ════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════
+//  MODELOS NUEVOS
+// ════════════════════════════════════════════════════════════
+async function loadModelosNuevos () {
+  const items = await api.getModelosNuevos()
+  modelosNuevos = new Set(items.map(i => i.codigo))
+  // Mostrar/ocultar botón "Marcar todos como vistos"
+  const btn = document.getElementById('btnMarcarTodos')
+  if (btn) btn.style.display = modelosNuevos.size > 0 ? 'inline-flex' : 'none'
+}
+
+async function marcarVisto (codigo) {
+  await api.marcarModeloVisto(codigo)
+  modelosNuevos.delete(codigo)
+  // Quitar badge de la tarjeta sin re-renderizar todo
+  const thumb = document.getElementById(`thumb-${codigo}`)
+  if (thumb) { const b = thumb.querySelector('.nuevo-badge'); if (b) b.remove() }
+  const btn = document.getElementById('btnMarcarTodos')
+  if (btn) btn.style.display = modelosNuevos.size > 0 ? 'inline-flex' : 'none'
+}
+
+async function marcarTodosVistos () {
+  await api.marcarTodosVistos()
+  modelosNuevos.clear()
+  document.querySelectorAll('.nuevo-badge').forEach(b => b.remove())
+  const btn = document.getElementById('btnMarcarTodos')
+  if (btn) btn.style.display = 'none'
+}
+
 async function loadCatalogo () {
   catalogoItems = await api.getCatalogoCompleto(cfg.rutaExcel)
   renderCatFiltros()
@@ -1273,7 +1317,9 @@ function renderCatalogo () {
     return
   }
 
-  grid.innerHTML = items.map(item => `
+  grid.innerHTML = items.map(item => {
+    const esNuevo = modelosNuevos.has(item.codigo)
+    return `
     <div class="catalogo-card" onclick="openViewer('${item.codigo}','${item.carpeta}','${item.archivo1}')">
       <div class="catalogo-card-img" id="thumb-${item.codigo}"
         ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
@@ -1283,6 +1329,8 @@ function renderCatalogo () {
           <div class="stl-spinner"></div>
         </div>
         <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>
+        ${esNuevo ? `<div class="nuevo-badge" title="Nuevo — clic para marcar como visto"
+          onclick="event.stopPropagation();marcarVisto('${item.codigo}')"></div>` : ''}
       </div>
       <div class="catalogo-card-info">
         <div class="catalogo-card-code">${item.codigo}</div>
@@ -1292,7 +1340,8 @@ function renderCatalogo () {
           🖨 Imprimir
         </button>
       </div>
-    </div>`).join('')
+    </div>`
+  }).join('')
 
   // Cargar thumbnails en lotes para no saturar WebGL
   loadThumbsEnLotes(items)
@@ -1626,6 +1675,7 @@ let threeRenderer   = null
 let threeScene      = null
 let threeCamera     = null
 let threeAnimId     = null
+let modelosNuevos   = new Set()  // codigos marcados como nuevos
 
 // ════════════════════════════════════════════════════════════
 //  INIT
@@ -1639,6 +1689,7 @@ async function init () {
   await loadCostos()
   await loadCatalogoCodigos()
   await loadCatalogo()
+  await loadModelosNuevos()
   populateColorSelects()
   // Polling de stock cada 10 segundos para sincronización con e500-app
   setInterval(async () => {
@@ -1846,6 +1897,9 @@ async function startCompare () {
       btnAgregar.disabled = true
       btnAgregar.textContent = 'Agregando...'
       const res = await api.agregarACatalogo({ rutaExcel: cfg.rutaExcel, modelos: result.soloCarpeta })
+      // Registrar como nuevos en la DB
+      await api.registrarModelosNuevos(result.soloCarpeta)
+      await loadModelosNuevos()
       addLine(`✅ ${res.agregados} modelos agregados al catálogo Excel`, 'var(--ok)', '✓')
       await loadCatalogo()
       btnAgregar.textContent = `✅ ${res.agregados} agregados`
@@ -1905,6 +1959,12 @@ async function startSync () {
   document.getElementById('sAgr').textContent = stats.agregados
   document.getElementById('sAdv').textContent = stats.advertencias
   document.getElementById('sErr').textContent = stats.errores
+  // Si se agregaron modelos nuevos al catálogo, recargar lista y marcarlos
+  if (stats.modelosAgregados && stats.modelosAgregados.length) {
+    await api.registrarModelosNuevos(stats.modelosAgregados)
+    await loadModelosNuevos()
+    await loadCatalogo()
+  }
   // Animar barras de progreso
   const total = stats.renombrados + stats.agregados + stats.advertencias + stats.errores || 1
   setTimeout(() => {

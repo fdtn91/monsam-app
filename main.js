@@ -294,9 +294,36 @@ ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
   return { ok: true, agregados }
 })
 
+// ════════════════════════════════════════════════════════════
+//  MODELOS NUEVOS — marcador hasta que el usuario lo vea
+// ════════════════════════════════════════════════════════════
+ipcMain.handle('get-modelos-nuevos', () => {
+  return db.prepare('SELECT codigo, carpeta, archivo1, added_at FROM modelos_nuevos ORDER BY added_at DESC').all()
+})
+
+ipcMain.handle('marcar-modelo-visto', (_, codigo) => {
+  db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
+  return true
+})
+
+ipcMain.handle('marcar-todos-vistos', () => {
+  db.prepare('DELETE FROM modelos_nuevos').run()
+  return true
+})
+
+ipcMain.handle('registrar-modelos-nuevos', (_, modelos) => {
+  const ins = db.prepare(`
+    INSERT OR IGNORE INTO modelos_nuevos (codigo, carpeta, archivo1)
+    VALUES (?, ?, ?)
+  `)
+  const many = db.transaction((items) => { for (const m of items) ins.run(m.codigo, m.carpeta||'', m.archivo1||'') })
+  many(modelos)
+  return true
+})
+
 ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
   const send  = (type, data) => event.sender.send('sync-log', { type, data })
-  const stats = { renombrados:0, agregados:0, advertencias:0, errores:0 }
+  const stats = { renombrados:0, agregados:0, advertencias:0, errores:0, _modelosAgregados:[] }
   if (!fs.existsSync(rutaBase)) { send('error','Carpeta de aretes no encontrada.'); return stats }
   send('info','Leyendo catálogo Excel...')
   const codigos = readExcelCodes(rutaExcel)
@@ -335,7 +362,7 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
       else if (fs.existsSync(rutaExcel)) {
         const ok = appendModelToExcel(rutaExcel, carpeta, cod, nn1, nn2)
         send(ok?'ok':'error', ok?'Agregado al catálogo':'Error al escribir Excel')
-        if (ok) { codigos.add(cod); stats.agregados++ } else stats.errores++
+        if (ok) { codigos.add(cod); stats.agregados++; stats._modelosAgregados.push({ codigo: cod, carpeta, archivo1: nn1 }) } else stats.errores++
       }
       cnt++
     }
@@ -345,6 +372,8 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
   send('divider','')
   send('ok', stats.renombrados===0&&stats.advertencias===0&&stats.errores===0
     ? 'Todo al día — no había modelos nuevos.' : 'Sincronización completada.')
+  // Adjuntar lista de modelos agregados para registrarlos como nuevos
+  stats.modelosAgregados = stats._modelosAgregados || []
   return stats
 })
 
