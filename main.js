@@ -1,12 +1,14 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron')
 const path    = require('path')
 const fs      = require('fs')
+const http    = require('http')
 const { spawn } = require('child_process')
+const XLSX    = require('xlsx')
 const { getDB, migrateFromExcel } = require('./db')
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  CONFIG
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 const CONFIG_PATH = path.join(__dirname, 'config.json')
 
 function loadConfig () {
@@ -20,9 +22,9 @@ function saveConfig (cfg) {
 ipcMain.handle('get-config', () => loadConfig())
 ipcMain.handle('save-config', (_, cfg) => { saveConfig(cfg); return true })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  DB — inicializar al arrancar
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 let db = null
 
 function initDB () {
@@ -40,13 +42,25 @@ function initDB () {
       archivo1  TEXT DEFAULT '',
       added_at  TEXT DEFAULT (datetime('now','localtime'))
     );
+    CREATE TABLE IF NOT EXISTS pedidos (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha_pedido TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+      cliente      TEXT    DEFAULT '',
+      notas        TEXT    DEFAULT '',
+      items        TEXT    NOT NULL DEFAULT '[]',
+      estado       TEXT    NOT NULL DEFAULT 'pendiente',
+      synced_at    TEXT    DEFAULT NULL,
+      created_at   TEXT    DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_ped_estado ON pedidos (estado);
+    CREATE INDEX IF NOT EXISTS idx_ped_fecha  ON pedidos (fecha_pedido);
   `)
   return db
 }
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  VENTANA
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function createWindow () {
   const win = new BrowserWindow({
     width: 1200, height: 760,
@@ -68,6 +82,7 @@ function createWindow () {
 app.whenReady().then(() => {
   initDB()
   createWindow()
+  startApiServer()
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 
@@ -78,9 +93,209 @@ ipcMain.on('win-maximize', e => {
 })
 ipcMain.on('win-close', e => BrowserWindow.fromWebContents(e.sender).close())
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  API REST — servidor HTTP para la app móvil
+//  Puerto: 4000 (configurable en config.json → apiPort)
+//
+//  GET  /api/ping                → { ok, version }
+//  GET  /api/catalogo            → [ { carpeta, codigo, archivo1, tieneFoto } ]
+//  GET  /api/foto/:codigo        → imagen binaria (jpg/png/webp)
+//  GET  /api/colores             → [ { id, nombre, hex, stockGr } ]
+//  POST /api/pedidos             → guarda pedido { cliente, notas, items, fecha_pedido }
+//  GET  /api/pedidos             → lista pedidos
+//  PUT  /api/pedidos/:id/estado  → { estado } actualiza estado
+// ╚══════════════════════════════════════════════════════════════════════════╝
+let apiServer = null
+
+function startApiServer () {
+  const cfg  = loadConfig()
+  const port = cfg.apiPort || 4000
+
+  apiServer = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+
+    const url   = new URL(req.url, `http://localhost:${port}`)
+    const route = url.pathname
+
+    const json = (data, code = 200) => {
+      res.writeHead(code, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(data))
+    }
+    const notFound = () => json({ error: 'Not found' }, 404)
+    const bodyJSON = () => new Promise((resolve, reject) => {
+      let raw = ''
+      req.on('data', d => raw += d)
+      req.on('end', () => {
+        try { resolve(JSON.parse(raw || '{}')) }
+        catch { reject(new Error('JSON inválido')) }
+      })
+    })
+
+    try {
+      // GET /api/ping
+      if (req.method === 'GET' && route === '/api/ping') {
+        return json({ ok: true, version: '1.0.0', app: 'MONSAN' })
+      }
+
+      // GET /api/catalogo
+      if (req.method === 'GET' && route === '/api/catalogo') {
+        const cfg2      = loadConfig()
+        const rutaExcel = cfg2.rutaExcel || cfg2.rutaExcelMonsan
+        if (!rutaExcel || !fs.existsSync(rutaExcel)) return json([])
+        const wb   = XLSX.readFile(rutaExcel)
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        const rutaAretes = cfg2.rutaAretes || ''
+        const items = []
+        for (let i = 1; i < rows.length; i++) {
+          const carpeta  = String(rows[i][0] || '').trim()
+          const codigo   = String(rows[i][1] || '').trim()
+          const archivo1 = String(rows[i][2] || '').trim()
+          if (!codigo || codigo === 'TOTAL DE PARES') continue
+          let tieneFoto = false
+          if (rutaAretes) {
+            const fotosDir = path.join(rutaAretes, 'fotos')
+            for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
+              if (fs.existsSync(path.join(fotosDir, `${codigo}${ext}`))) { tieneFoto = true; break }
+            }
+          }
+          let tieneStl = false
+          if (rutaAretes && carpeta && archivo1) {
+            tieneStl = fs.existsSync(path.join(rutaAretes, carpeta, archivo1))
+          }
+          items.push({ carpeta, codigo, archivo1, tieneFoto, tieneStl })
+        }
+        return json(items)
+      }
+
+      // GET /api/foto/:codigo
+      if (req.method === 'GET' && route.startsWith('/api/foto/')) {
+        const codigo     = decodeURIComponent(route.replace('/api/foto/', ''))
+        const cfg2       = loadConfig()
+        const rutaAretes = cfg2.rutaAretes || ''
+        if (!rutaAretes) return json({ error: 'rutaAretes no configurada' }, 404)
+        const fotosDir = path.join(rutaAretes, 'fotos')
+        let fotoPath = null
+        for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
+          const p = path.join(fotosDir, `${codigo}${ext}`)
+          if (fs.existsSync(p)) { fotoPath = p; break }
+        }
+        if (!fotoPath) return notFound()
+        const ext  = path.extname(fotoPath).toLowerCase()
+        const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+        res.writeHead(200, { 'Content-Type': mime })
+        return fs.createReadStream(fotoPath).pipe(res)
+      }
+
+      // GET /api/colores
+      if (req.method === 'GET' && route === '/api/colores') {
+        const rows = db.prepare(`
+          SELECT id, nombre, color_hex as hex, stock_gr as stockGr, notas
+          FROM filamentos ORDER BY nombre
+        `).all()
+        return json(rows)
+      }
+
+      // POST /api/pedidos
+      if (req.method === 'POST' && route === '/api/pedidos') {
+        bodyJSON().then(body => {
+          const { cliente = '', notas = '', items = [], fecha_pedido } = body
+          if (!Array.isArray(items) || items.length === 0)
+            return json({ ok: false, error: 'items requerido' }, 400)
+          const fecha  = fecha_pedido || new Date().toISOString()
+          const result = db.prepare(`
+            INSERT INTO pedidos (fecha_pedido, cliente, notas, items, estado, synced_at)
+            VALUES (?, ?, ?, ?, 'pendiente', datetime('now','localtime'))
+          `).run(fecha, cliente, notas, JSON.stringify(items))
+          BrowserWindow.getAllWindows().forEach(w =>
+            w.webContents.send('pedido-nuevo', { id: result.lastInsertRowid })
+          )
+          return json({ ok: true, id: result.lastInsertRowid })
+        }).catch(e => json({ ok: false, error: e.message }, 400))
+        return
+      }
+
+      // GET /api/pedidos
+      if (req.method === 'GET' && route === '/api/pedidos') {
+        const estado = url.searchParams.get('estado') || null
+        const query  = estado
+          ? db.prepare('SELECT * FROM pedidos WHERE estado=? ORDER BY fecha_pedido DESC')
+          : db.prepare('SELECT * FROM pedidos ORDER BY fecha_pedido DESC')
+        const rows   = estado ? query.all(estado) : query.all()
+        return json(rows.map(r => ({ ...r, items: JSON.parse(r.items || '[]') })))
+      }
+
+      // PUT /api/pedidos/:id/estado
+      if (req.method === 'PUT' && route.match(/^\/api\/pedidos\/\d+\/estado$/)) {
+        const id = parseInt(route.split('/')[3])
+        bodyJSON().then(body => {
+          const { estado } = body
+          const valid = ['pendiente','visto','en_proceso','listo','entregado']
+          if (!valid.includes(estado)) return json({ ok: false, error: 'estado inválido' }, 400)
+          db.prepare('UPDATE pedidos SET estado=? WHERE id=?').run(estado, id)
+          return json({ ok: true })
+        }).catch(e => json({ ok: false, error: e.message }, 400))
+        return
+      }
+
+      notFound()
+    } catch (e) {
+      console.error('[API]', e.message)
+      json({ error: e.message }, 500)
+    }
+  })
+
+  apiServer.listen(port, '0.0.0.0', () => {
+    console.log(`[API] Servidor móvil escuchando en 0.0.0.0:${port}`)
+  })
+  apiServer.on('error', e => console.error('[API] Error:', e.message))
+}
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  IPC — PEDIDOS
+// ╚══════════════════════════════════════════════════════════════════════════╝
+ipcMain.handle('get-pedidos', (_, filtro) => {
+  const estado = filtro?.estado || null
+  const query  = estado
+    ? db.prepare('SELECT * FROM pedidos WHERE estado=? ORDER BY fecha_pedido DESC')
+    : db.prepare('SELECT * FROM pedidos ORDER BY fecha_pedido DESC')
+  const rows = estado ? query.all(estado) : query.all()
+  return rows.map(r => ({ ...r, items: JSON.parse(r.items || '[]') }))
+})
+
+ipcMain.handle('set-estado-pedido', (_, id, estado) => {
+  const valid = ['pendiente','visto','en_proceso','listo','entregado']
+  if (!valid.includes(estado)) return { ok: false, error: 'estado inválido' }
+  db.prepare('UPDATE pedidos SET estado=? WHERE id=?').run(estado, id)
+  return { ok: true }
+})
+
+ipcMain.handle('delete-pedido', (_, id) => {
+  db.prepare('DELETE FROM pedidos WHERE id=?').run(id)
+  return { ok: true }
+})
+
+ipcMain.handle('get-api-port', () => {
+  const cfg = loadConfig()
+  return cfg.apiPort || 4000
+})
+
+ipcMain.handle('get-local-ip', () => {
+  const { networkInterfaces } = require('os')
+  const nets = networkInterfaces()
+  for (const name of Object.keys(nets))
+    for (const net of nets[name])
+      if (net.family === 'IPv4' && !net.internal) return net.address
+  return '127.0.0.1'
+})
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  DIÁLOGOS
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('select-folder',    async (_, def) => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory'], defaultPath: def||'' })
   return r.canceled ? null : r.filePaths[0]
@@ -93,7 +308,7 @@ ipcMain.handle('select-gcode-dir', async (_, def) => {
   const r = await dialog.showOpenDialog({ properties: ['openDirectory'], defaultPath: def||'' })
   return r.canceled ? null : r.filePaths[0]
 })
-ipcMain.handle('select-gcode', async (_, def) => {
+ipcMain.handle('select-gcode',     async (_, def) => {
   const r = await dialog.showOpenDialog({
     filters: [{name:'G-code', extensions:['gcode','g','gc']}], defaultPath: def||''
   })
@@ -104,9 +319,9 @@ ipcMain.handle('open-excel', async (_, p) => {
   return false
 })
 
-// ════════════════════════════════════════════════════════════
-//  CATÁLOGO — fotos y STL (sin cambios, siguen usando filesystem)
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  CATÁLOGO — fotos y STL
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('select-foto', async (_, def) => {
   const r = await dialog.showOpenDialog({
     filters: [{name:'Imágenes', extensions:['jpg','jpeg','png','webp']}], defaultPath: def||''
@@ -142,10 +357,9 @@ ipcMain.handle('get-stl-base64', (_, rutaAretes, carpeta, archivo) => {
   } catch { return null }
 })
 
-// ════════════════════════════════════════════════════════════
-//  EXCEL helpers — solo para sync de catálogo STL
-// ════════════════════════════════════════════════════════════
-const XLSX = require('xlsx')
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  EXCEL helpers
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function readWB (p)    { if (!p || !fs.existsSync(p)) return null; try { return XLSX.readFile(p) } catch { return null } }
 function saveWB (wb,p) { try { XLSX.writeFile(wb,p); return true } catch { return false } }
 function toRows (ws)   { return XLSX.utils.sheet_to_json(ws, { header:1, defval:'' }) }
@@ -172,9 +386,9 @@ ipcMain.handle('get-catalogo-codigos', (_, filePath) => {
   return [...codigos].sort()
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  STL helpers
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function getSTLStats (p) {
   try {
     const buf = fs.readFileSync(p)
@@ -189,9 +403,9 @@ function compareSTL (a, b, tol = 0.05) {
   return mx > 0 && Math.abs(a.tris - b.tris) / mx <= tol
 }
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  SINCRONIZAR STLs
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function readExcelCodes (filePath) {
   const codes = new Set()
   const wb = readWB(filePath)
@@ -218,153 +432,6 @@ function appendModelToExcel (filePath, carpeta, codigo, f1, f2) {
     return saveWB(wb, filePath)
   } catch { return false }
 }
-
-// ════════════════════════════════════════════════════════════
-//  COMPARAR DB vs CARPETAS
-// ════════════════════════════════════════════════════════════
-ipcMain.handle('compare-db-carpetas', (_, { rutaBase, rutaExcel }) => {
-  const result = {
-    soloCarpeta: [],   // STLs en carpeta pero no en catálogo/DB
-    soloDB:      [],   // en catálogo/DB pero sin carpeta en disco
-    enAmbos:     [],   // coinciden
-    errores:     []
-  }
-
-  // 1. Leer modelos del catálogo Excel
-  const catalogoSet = new Map() // codigo -> { carpeta, archivo1 }
-  try {
-    const wb = readWB(rutaExcel)
-    if (wb) {
-      const rows = toRows(wb.Sheets[wb.SheetNames[0]])
-      rows.slice(1).forEach(r => {
-        const codigo = String(r[1]||'').trim()
-        const carpeta = String(r[0]||'').trim()
-        const archivo1 = String(r[2]||'').trim()
-        if (codigo && codigo !== 'TOTAL DE PARES')
-          catalogoSet.set(codigo, { carpeta, archivo1 })
-      })
-    }
-  } catch (e) { result.errores.push(`Error leyendo Excel: ${e.message}`) }
-
-  // 2. Escanear carpetas en disco — buscar archivos renombrados (COD_1.stl)
-  const carpetaSet = new Map() // codigo -> { carpeta, archivo1, rutaCompleta }
-  try {
-    if (fs.existsSync(rutaBase)) {
-      const dirs = fs.readdirSync(rutaBase, { withFileTypes: true })
-        .filter(d => d.isDirectory()).map(d => d.name)
-
-      for (const carpeta of dirs) {
-        const cp    = path.join(rutaBase, carpeta)
-        const files = fs.readdirSync(cp).filter(f => f.endsWith('.stl'))
-        // Buscar archivos con patrón prefijo+número_1.stl (ya renombrados)
-        const renombrados = files.filter(f => /^[A-Z]{2,5}\d+_1\.stl$/i.test(f))
-        for (const f of renombrados) {
-          const codigo = f.replace(/_1\.stl$/i, '')
-          carpetaSet.set(codigo, { carpeta, archivo1: f, rutaCompleta: path.join(cp, f) })
-        }
-      }
-    }
-  } catch (e) { result.errores.push(`Error escaneando carpetas: ${e.message}`) }
-
-  // 3. Comparar
-  const todosCodigos = new Set([...catalogoSet.keys(), ...carpetaSet.keys()])
-
-  for (const codigo of todosCodigos) {
-    const enCatalogo = catalogoSet.has(codigo)
-    const enCarpeta  = carpetaSet.has(codigo)
-
-    if (enCatalogo && enCarpeta) {
-      // Verificar que el archivo físico existe
-      const info = carpetaSet.get(codigo)
-      const existe = fs.existsSync(info.rutaCompleta)
-      result.enAmbos.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1, archivoExiste: existe })
-    } else if (enCarpeta && !enCatalogo) {
-      const info = carpetaSet.get(codigo)
-      result.soloCarpeta.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1 })
-    } else if (enCatalogo && !enCarpeta) {
-      const info = catalogoSet.get(codigo)
-      // Verificar si el archivo existe en la ruta del catálogo
-      const rutaStl = path.join(rutaBase, info.carpeta, info.archivo1)
-      const existe  = fs.existsSync(rutaStl)
-      result.soloDB.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1, archivoExiste: existe })
-    }
-  }
-
-  return result
-})
-
-// Agregar modelos faltantes al Excel desde la comparación
-ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
-  let agregados = 0
-  for (const m of modelos) {
-    const ok = appendModelToExcel(rutaExcel, m.carpeta, m.codigo, m.archivo1, m.archivo1.replace('_1.', '_2.'))
-    if (ok) agregados++
-  }
-  return { ok: true, agregados }
-})
-
-// ════════════════════════════════════════════════════════════
-//  ELIMINAR MODELO
-// ════════════════════════════════════════════════════════════
-ipcMain.handle('eliminar-modelo', (_, { rutaAretes, rutaExcel, codigo }) => {
-  const result = { ok: false, fotoEliminada: false, excelActualizado: false, dbActualizado: false, error: '' }
-
-  try {
-    // 1. Eliminar foto si existe
-    const fotosDir = path.join(rutaAretes, 'fotos')
-    for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
-      const fotoPath = path.join(fotosDir, `${codigo}${ext}`)
-      if (fs.existsSync(fotoPath)) {
-        fs.unlinkSync(fotoPath)
-        result.fotoEliminada = true
-      }
-    }
-
-    // 2. Eliminar del catálogo Excel
-    const wb = readWB(rutaExcel)
-    if (wb) {
-      const ws   = wb.Sheets[wb.SheetNames[0]]
-      const rows = toRows(ws).filter((r, i) => {
-        if (i === 0) return true  // mantener cabecera
-        return String(r[1]||'').trim() !== codigo
-      })
-      wb.Sheets[wb.SheetNames[0]] = toSheet(rows)
-      result.excelActualizado = saveWB(wb, rutaExcel)
-    }
-
-    // 3. Eliminar de modelos_nuevos si estaba
-    db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
-    result.dbActualizado = true
-    result.ok = true
-  } catch (e) {
-    result.error = e.message
-  }
-
-  return result
-})
-ipcMain.handle('get-modelos-nuevos', () => {
-  return db.prepare('SELECT codigo, carpeta, archivo1, added_at FROM modelos_nuevos ORDER BY added_at DESC').all()
-})
-
-ipcMain.handle('marcar-modelo-visto', (_, codigo) => {
-  db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
-  return true
-})
-
-ipcMain.handle('marcar-todos-vistos', () => {
-  db.prepare('DELETE FROM modelos_nuevos').run()
-  return true
-})
-
-ipcMain.handle('registrar-modelos-nuevos', (_, modelos) => {
-  const ins = db.prepare(`
-    INSERT OR IGNORE INTO modelos_nuevos (codigo, carpeta, archivo1)
-    VALUES (?, ?, ?)
-  `)
-  const many = db.transaction((items) => { for (const m of items) ins.run(m.codigo, m.carpeta||'', m.archivo1||'') })
-  many(modelos)
-  return true
-})
 
 ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
   const send  = (type, data) => event.sender.send('sync-log', { type, data })
@@ -407,7 +474,11 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
       else if (fs.existsSync(rutaExcel)) {
         const ok = appendModelToExcel(rutaExcel, carpeta, cod, nn1, nn2)
         send(ok?'ok':'error', ok?'Agregado al catálogo':'Error al escribir Excel')
-        if (ok) { codigos.add(cod); stats.agregados++; stats._modelosAgregados.push({ codigo: cod, carpeta, archivo1: nn1 }) } else stats.errores++
+        if (ok) {
+          codigos.add(cod)
+          stats.agregados++
+          stats._modelosAgregados.push({ codigo: cod, carpeta, archivo1: nn1 })
+        } else stats.errores++
       }
       cnt++
     }
@@ -417,15 +488,133 @@ ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
   send('divider','')
   send('ok', stats.renombrados===0&&stats.advertencias===0&&stats.errores===0
     ? 'Todo al día — no había modelos nuevos.' : 'Sincronización completada.')
-  // Adjuntar lista de modelos agregados para registrarlos como nuevos
   stats.modelosAgregados = stats._modelosAgregados || []
   return stats
 })
 
-// ════════════════════════════════════════════════════════════
-//  COLORES — ahora lee de la tabla filamentos (DB compartida)
-//  monsam ve los filamentos de e500 como "colores"
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  COMPARAR DB vs CARPETAS
+// ╚══════════════════════════════════════════════════════════════════════════╝
+ipcMain.handle('compare-db-carpetas', (_, { rutaBase, rutaExcel }) => {
+  const result = { soloCarpeta:[], soloDB:[], enAmbos:[], errores:[] }
+
+  const catalogoSet = new Map()
+  try {
+    const wb = readWB(rutaExcel)
+    if (wb) {
+      const rows = toRows(wb.Sheets[wb.SheetNames[0]])
+      rows.slice(1).forEach(r => {
+        const codigo   = String(r[1]||'').trim()
+        const carpeta  = String(r[0]||'').trim()
+        const archivo1 = String(r[2]||'').trim()
+        if (codigo && codigo !== 'TOTAL DE PARES')
+          catalogoSet.set(codigo, { carpeta, archivo1 })
+      })
+    }
+  } catch (e) { result.errores.push(`Error leyendo Excel: ${e.message}`) }
+
+  const carpetaSet = new Map()
+  try {
+    if (fs.existsSync(rutaBase)) {
+      const dirs = fs.readdirSync(rutaBase, { withFileTypes: true })
+        .filter(d => d.isDirectory()).map(d => d.name)
+      for (const carpeta of dirs) {
+        const cp    = path.join(rutaBase, carpeta)
+        const files = fs.readdirSync(cp).filter(f => f.endsWith('.stl'))
+        const renombrados = files.filter(f => /^[A-Z]{2,5}\d+_1\.stl$/i.test(f))
+        for (const f of renombrados) {
+          const codigo = f.replace(/_1\.stl$/i, '')
+          carpetaSet.set(codigo, { carpeta, archivo1: f, rutaCompleta: path.join(cp, f) })
+        }
+      }
+    }
+  } catch (e) { result.errores.push(`Error escaneando carpetas: ${e.message}`) }
+
+  const todosCodigos = new Set([...catalogoSet.keys(), ...carpetaSet.keys()])
+  for (const codigo of todosCodigos) {
+    const enCatalogo = catalogoSet.has(codigo)
+    const enCarpeta  = carpetaSet.has(codigo)
+    if (enCatalogo && enCarpeta) {
+      const info = carpetaSet.get(codigo)
+      result.enAmbos.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1,
+        archivoExiste: fs.existsSync(info.rutaCompleta) })
+    } else if (enCarpeta && !enCatalogo) {
+      const info = carpetaSet.get(codigo)
+      result.soloCarpeta.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1 })
+    } else if (enCatalogo && !enCarpeta) {
+      const info    = catalogoSet.get(codigo)
+      const rutaStl = path.join(rutaBase, info.carpeta, info.archivo1)
+      result.soloDB.push({ codigo, carpeta: info.carpeta, archivo1: info.archivo1,
+        archivoExiste: fs.existsSync(rutaStl) })
+    }
+  }
+  return result
+})
+
+ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
+  let agregados = 0
+  for (const m of modelos) {
+    const ok = appendModelToExcel(rutaExcel, m.carpeta, m.codigo, m.archivo1, m.archivo1.replace('_1.', '_2.'))
+    if (ok) agregados++
+  }
+  return { ok: true, agregados }
+})
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  ELIMINAR MODELO
+// ╚══════════════════════════════════════════════════════════════════════════╝
+ipcMain.handle('eliminar-modelo', (_, { rutaAretes, rutaExcel, codigo }) => {
+  const result = { ok:false, fotoEliminada:false, excelActualizado:false, dbActualizado:false, error:'' }
+  try {
+    // 1. Eliminar foto
+    const fotosDir = path.join(rutaAretes, 'fotos')
+    for (const ext of ['.jpg','.jpeg','.png','.webp']) {
+      const fotoPath = path.join(fotosDir, `${codigo}${ext}`)
+      if (fs.existsSync(fotoPath)) { fs.unlinkSync(fotoPath); result.fotoEliminada = true }
+    }
+    // 2. Eliminar del catálogo Excel
+    const wb = readWB(rutaExcel)
+    if (wb) {
+      const rows = toRows(wb.Sheets[wb.SheetNames[0]])
+        .filter((r, i) => i === 0 || String(r[1]||'').trim() !== codigo)
+      wb.Sheets[wb.SheetNames[0]] = toSheet(rows)
+      result.excelActualizado = saveWB(wb, rutaExcel)
+    }
+    // 3. Eliminar de modelos_nuevos
+    db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
+    result.dbActualizado = true
+    result.ok = true
+  } catch (e) { result.error = e.message }
+  return result
+})
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  MODELOS NUEVOS
+// ╚══════════════════════════════════════════════════════════════════════════╝
+ipcMain.handle('get-modelos-nuevos', () => {
+  return db.prepare('SELECT codigo, carpeta, archivo1, added_at FROM modelos_nuevos ORDER BY added_at DESC').all()
+})
+
+ipcMain.handle('marcar-modelo-visto', (_, codigo) => {
+  db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
+  return true
+})
+
+ipcMain.handle('marcar-todos-vistos', () => {
+  db.prepare('DELETE FROM modelos_nuevos').run()
+  return true
+})
+
+ipcMain.handle('registrar-modelos-nuevos', (_, modelos) => {
+  const ins  = db.prepare('INSERT OR IGNORE INTO modelos_nuevos (codigo,carpeta,archivo1) VALUES (?,?,?)')
+  const many = db.transaction((items) => { for (const m of items) ins.run(m.codigo, m.carpeta||'', m.archivo1||'') })
+  many(modelos)
+  return true
+})
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+//  COLORES — lee de la tabla filamentos con código corto generado
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('get-colores', () => {
   const rows = db.prepare(`
     SELECT id, nombre, color_hex as hex, notas as descripcion,
@@ -433,20 +622,13 @@ ipcMain.handle('get-colores', () => {
     FROM filamentos ORDER BY nombre
   `).all()
 
-  // Palabras a ignorar: tipos de material y marcas comunes
   const IGNORAR = /\b(PLA|PETG|ABS|TPU|ASA|NYLON|SILK|WOOD|METAL|SUNLU|ESUN|BAMBU|CREALITY|HATCHBOX|POLYMAKER|PRUSAMENT|BASICFIL|MEXICOMAKERS|MATTE|PLUS|PRO|MAX|LITE|BASIC)\b/gi
-
   const usedCodes = new Set()
+
   return rows.map(r => {
-    // Eliminar tipo y marca, tomar primera palabra del color puro
-    const colorPuro = r.nombre
-      .replace(IGNORAR, '')
-      .trim()
-      .split(/\s+/)
+    const colorPuro = r.nombre.replace(IGNORAR, '').trim().split(/\s+/)
       .find(p => p.replace(/[^a-zA-Z]/g,'').length >= 2) || 'COL'
-
-    const base = colorPuro.replace(/[^a-zA-Z]/g,'').substring(0, 3).toUpperCase()
-
+    const base   = colorPuro.replace(/[^a-zA-Z]/g,'').substring(0, 3).toUpperCase()
     let n = 1
     while (usedCodes.has(`${base}${n}`)) n++
     const codigo = `${base}${n}`
@@ -458,15 +640,12 @@ ipcMain.handle('get-colores', () => {
 ipcMain.handle('save-color', (_, __, color) => {
   const nombre = color.nombre || ''
   if (!nombre) return null
-
-  // Generar código si no viene
   let codigo = color.codigo
   if (!codigo) {
-    const base = nombre.replace(/[^a-zA-Z]/g,'').substring(0,3).toUpperCase()
+    const base     = nombre.replace(/[^a-zA-Z]/g,'').substring(0,3).toUpperCase()
     const existing = db.prepare("SELECT nombre FROM filamentos WHERE nombre LIKE ? || '%'").all(base)
     codigo = `${base}${existing.length + 1}`
   }
-
   db.prepare(`
     INSERT INTO filamentos (nombre, costo_kg, stock_gr, color_hex, notas)
     VALUES (?,?,?,?,?)
@@ -475,7 +654,6 @@ ipcMain.handle('save-color', (_, __, color) => {
       color_hex=excluded.color_hex, notas=excluded.notas,
       updated_at=datetime('now','localtime')
   `).run(nombre, color.costoPorKg||0, color.stockGr||0, color.hex||'#888888', color.descripcion||'')
-
   return codigo
 })
 
@@ -484,17 +662,13 @@ ipcMain.handle('delete-color', (_, __, nombre) => {
   return true
 })
 
-// Refrescar stock desde la DB compartida (para sincronización en tiempo real)
 ipcMain.handle('refresh-stock', () => {
-  return db.prepare(`
-    SELECT nombre, stock_gr as stockGr, updated_at
-    FROM filamentos ORDER BY nombre
-  `).all()
+  return db.prepare('SELECT nombre, stock_gr as stockGr, updated_at FROM filamentos ORDER BY nombre').all()
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  INVENTARIO
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('get-inventario', () => {
   return db.prepare(`
     SELECT id as _idx, sku, modelo, color, codigo_color as codigoColor,
@@ -521,8 +695,7 @@ ipcMain.handle('descontar-stock', (_, __, sku, qty) => {
   const row = db.prepare('SELECT pares FROM inventario WHERE sku=?').get(sku)
   if (!row) return { ok:false, msg:`SKU ${sku} no encontrado` }
   if (row.pares < qty) return { ok:false, msg:`Stock insuficiente (${row.pares} pares disponibles)` }
-  db.prepare(`UPDATE inventario SET pares=pares-?, updated_at=datetime('now','localtime') WHERE sku=?`)
-    .run(qty, sku)
+  db.prepare(`UPDATE inventario SET pares=pares-?, updated_at=datetime('now','localtime') WHERE sku=?`).run(qty, sku)
   return { ok:true, msg:`Stock actualizado: ${row.pares - qty} pares` }
 })
 
@@ -531,26 +704,19 @@ ipcMain.handle('delete-inventario', (_, __, sku) => {
   return true
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  CLIENTES
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('get-clientes', () => {
-  const rows = db.prepare('SELECT * FROM clientes ORDER BY tipo, nombre').all()
+  const rows   = db.prepare('SELECT * FROM clientes ORDER BY tipo, nombre').all()
   const result = { directo:[], distribuidor:[], mayoreo:[] }
   rows.forEach((r, i) => {
     const c = {
-      _idx:               i,
-      nombre:             r.nombre,
-      contacto:           r.contacto,
-      direccion:          r.direccion,
-      rfc:                r.rfc,
-      notas:              r.notas,
-      fechaRegistro:      r.fecha_registro,
-      fechaUltimaCompra:  r.fecha_ultima_compra,
-      piezasUltimaCompra: r.piezas_ultima_compra,
+      _idx: i, nombre: r.nombre, contacto: r.contacto, direccion: r.direccion,
+      rfc: r.rfc, notas: r.notas, fechaRegistro: r.fecha_registro,
+      fechaUltimaCompra: r.fecha_ultima_compra, piezasUltimaCompra: r.piezas_ultima_compra,
       acumuladoHistorico: r.acumulado_historico,
-      skus:               r.skus ? String(r.skus).split(',').map(s=>s.trim()) : [],
-      _id:                r.id
+      skus: r.skus ? String(r.skus).split(',').map(s=>s.trim()) : [], _id: r.id
     }
     if (result[r.tipo]) result[r.tipo].push(c)
   })
@@ -561,10 +727,8 @@ ipcMain.handle('save-cliente', (_, __, cliente) => {
   const skusStr = Array.isArray(cliente.skus) ? cliente.skus.join(', ') : (cliente.skus||'')
   if (cliente._id) {
     db.prepare(`
-      UPDATE clientes SET
-        tipo=?, nombre=?, contacto=?, direccion=?, rfc=?, notas=?,
-        fecha_registro=?, fecha_ultima_compra=?,
-        piezas_ultima_compra=?, acumulado_historico=?, skus=?
+      UPDATE clientes SET tipo=?,nombre=?,contacto=?,direccion=?,rfc=?,notas=?,
+        fecha_registro=?,fecha_ultima_compra=?,piezas_ultima_compra=?,acumulado_historico=?,skus=?
       WHERE id=?
     `).run(cliente.tipo, cliente.nombre, cliente.contacto||'', cliente.direccion||'',
            cliente.rfc||'', cliente.notas||'', cliente.fechaRegistro||'',
@@ -573,8 +737,7 @@ ipcMain.handle('save-cliente', (_, __, cliente) => {
   } else {
     db.prepare(`
       INSERT INTO clientes
-        (tipo, nombre, contacto, direccion, rfc, notas,
-         fecha_registro, fecha_ultima_compra, piezas_ultima_compra, acumulado_historico, skus)
+        (tipo,nombre,contacto,direccion,rfc,notas,fecha_registro,fecha_ultima_compra,piezas_ultima_compra,acumulado_historico,skus)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)
     `).run(cliente.tipo, cliente.nombre, cliente.contacto||'', cliente.direccion||'',
            cliente.rfc||'', cliente.notas||'', cliente.fechaRegistro||'',
@@ -585,15 +748,14 @@ ipcMain.handle('save-cliente', (_, __, cliente) => {
 })
 
 ipcMain.handle('delete-cliente', (_, __, rowIndex, tipo) => {
-  const row = db.prepare('SELECT id FROM clientes WHERE tipo=? ORDER BY nombre LIMIT 1 OFFSET ?')
-                .get(tipo, rowIndex)
+  const row = db.prepare('SELECT id FROM clientes WHERE tipo=? ORDER BY nombre LIMIT 1 OFFSET ?').get(tipo, rowIndex)
   if (row) db.prepare('DELETE FROM clientes WHERE id=?').run(row.id)
   return true
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  G-CODE — parse y cálculo de costos
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function parseGcodeFile (filePath) {
   try {
     const lines = fs.readFileSync(filePath, 'utf8').split('\n').slice(0,200)
@@ -610,7 +772,7 @@ function parseGcodeFile (filePath) {
       horas = (h?+h[1]:0) + (m?+m[1]/60:0) + (s?+s[1]/3600:0)
     }
     const filamento = find([/;\s*filament_type\s*=\s*(.+)/i, /;\s*filament\s+type\s*=\s*(.+)/i])
-    return { pesoGr: pesoStr?parseFloat(pesoStr):null, horasImp:horas||null, filamento:filamento||null, tiempoRaw:tiempoStr||null }
+    return { pesoGr:pesoStr?parseFloat(pesoStr):null, horasImp:horas||null, filamento:filamento||null, tiempoRaw:tiempoStr||null }
   } catch (e) { return { error: e.message } }
 }
 
@@ -631,9 +793,9 @@ ipcMain.handle('calc-costo', (_, p) => {
   }
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  COSTOS
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('get-costos', () => {
   return db.prepare(`
     SELECT id as _idx, sku, modelo, color,
@@ -648,9 +810,7 @@ ipcMain.handle('get-costos', () => {
 ipcMain.handle('save-costo', (_, __, item) => {
   db.prepare(`
     INSERT INTO costos
-      (sku, modelo, color, peso_gr, horas_imp,
-       costo_filamento, costo_elec, costo_herrajes,
-       costo_empaque, desperdicio, costo_total, fecha)
+      (sku,modelo,color,peso_gr,horas_imp,costo_filamento,costo_elec,costo_herrajes,costo_empaque,desperdicio,costo_total,fecha)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(item.sku, item.modelo, item.color, item.pesoGr, item.horasImp,
          item.costoFilamento, item.costoElec, item.costoHerrajes,
@@ -659,11 +819,9 @@ ipcMain.handle('save-costo', (_, __, item) => {
   return true
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  MOONRAKER
-// ════════════════════════════════════════════════════════════
-const http = require('http')
-
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function moonrakerRequest (ip, method, endpoint, body) {
   return new Promise((resolve, reject) => {
     const data    = body ? JSON.stringify(body) : null
@@ -671,15 +829,15 @@ function moonrakerRequest (ip, method, endpoint, body) {
       hostname: ip.split(':')[0],
       port:     parseInt(ip.split(':')[1]) || 7125,
       path:     endpoint, method,
-      headers: { 'Content-Type':'application/json', 'Content-Length': data?Buffer.byteLength(data):0 },
-      timeout: 8000
+      headers:  { 'Content-Type':'application/json', 'Content-Length': data?Buffer.byteLength(data):0 },
+      timeout:  8000
     }
     const req = http.request(options, res => {
       let raw = ''
       res.on('data', d => raw += d)
       res.on('end', () => { try { resolve(JSON.parse(raw)) } catch { resolve({raw}) } })
     })
-    req.on('error', e => reject(e))
+    req.on('error',   e => reject(e))
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')) })
     if (data) req.write(data)
     req.end()
@@ -713,9 +871,9 @@ ipcMain.handle('moonraker-print-status', async (_, ip) => {
   } catch(e) { return { ok:false, state:'offline', error:e.message } }
 })
 
-// ════════════════════════════════════════════════════════════
+// ╔══════════════════════════════════════════════════════════════════════════╗
 //  ORCASLICER
-// ════════════════════════════════════════════════════════════
+// ╚══════════════════════════════════════════════════════════════════════════╝
 ipcMain.handle('open-orcaslicer', async (_, orcaPath, stlPaths) => {
   try {
     if (!fs.existsSync(orcaPath)) return { ok:false, error:`OrcaSlicer no encontrado en: ${orcaPath}` }
