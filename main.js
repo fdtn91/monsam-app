@@ -193,11 +193,15 @@ function startApiServer () {
 
       // GET /api/colores
       if (req.method === 'GET' && route === '/api/colores') {
+        const IGNORAR = /\b(PLA|PETG|ABS|TPU|ASA|NYLON|SILK|WOOD|METAL|SUNLU|ESUN|BAMBU|CREALITY|HATCHBOX|POLYMAKER|PRUSAMENT|BASICFIL|MEXICOMAKERS|MATTE|PLUS|PRO|MAX|LITE|BASIC)\b/gi
         const rows = db.prepare(`
           SELECT id, nombre, color_hex as hex, stock_gr as stockGr, notas
           FROM filamentos ORDER BY nombre
         `).all()
-        return json(rows)
+        return json(rows.map(r => ({
+          ...r,
+          nombre: r.nombre.replace(IGNORAR, '').replace(/\s+/g, ' ').trim()
+        })))
       }
 
       // POST /api/pedidos
