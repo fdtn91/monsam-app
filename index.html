@@ -362,7 +362,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 .viewer-header{ padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; flex-wrap:wrap; gap:8px; }
 .viewer-title{ font-size:17px; font-weight:800; }
 .viewer-body{ flex:1; display:grid; grid-template-columns:1fr 210px; overflow:hidden; min-height:0; }
-.viewer-canvas-wrap{ background:var(--s2); position:relative; min-height:360px; display:flex; align-items:center; justify-content:center; }
+.viewer-canvas-wrap{ background:var(--s2); position:relative; min-height:360px; max-height:65vh; overflow:hidden; display:flex; align-items:center; justify-content:center; }
 .viewer-canvas-wrap canvas{ display:block; }
 .viewer-sidebar{ border-left:1px solid var(--border); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
 .viewer-info-row{ font-size:12px; }
@@ -481,6 +481,21 @@ tr:hover td{ background:rgba(21,81,36,.04); }
           <div class="page-sub">Vista de todos los aretes · foto real o render 3D</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <!-- Toggle vista 3D / Fotos -->
+          <div style="display:flex;background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px;">
+            <button id="btnVista3D" onclick="setVistaCatalogo('3d')"
+              style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:11px;font-weight:700;
+                     font-family:'Gadugi','Segoe UI',sans-serif;transition:all .15s;
+                     background:var(--accent);color:#fff;">
+              ◈ 3D
+            </button>
+            <button id="btnVistaFoto" onclick="setVistaCatalogo('foto')"
+              style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:11px;font-weight:700;
+                     font-family:'Gadugi','Segoe UI',sans-serif;transition:all .15s;
+                     background:transparent;color:var(--text2);">
+              📷 Foto
+            </button>
+          </div>
           <input type="text" id="catBuscar" placeholder="Buscar código..." oninput="filtrarCatalogo()"
             style="background:var(--s2);border:1px solid var(--border);border-radius:6px;
                    padding:7px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;
@@ -1091,6 +1106,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
 // ════════════════════════════════════════════════════════════
 let catalogoItems    = []
 let catFiltroActual  = 'Todos'
+let catVistaActual   = '3d'   // '3d' | 'foto'
 let viewerData       = null
 let threeRenderer    = null
 let threeScene       = null
@@ -1119,6 +1135,20 @@ function setCatFiltro (filtro, btn) {
   catFiltroActual = filtro
   document.querySelectorAll('.cat-filtro').forEach(b => b.classList.remove('active'))
   btn.classList.add('active')
+  renderCatalogo()
+}
+
+function setVistaCatalogo (vista) {
+  catVistaActual = vista
+  const btn3d   = document.getElementById('btnVista3D')
+  const btnFoto = document.getElementById('btnVistaFoto')
+  if (vista === '3d') {
+    btn3d.style.background   = 'var(--accent)';  btn3d.style.color   = '#fff'
+    btnFoto.style.background = 'transparent';    btnFoto.style.color = 'var(--text2)'
+  } else {
+    btnFoto.style.background = 'var(--accent)';  btnFoto.style.color = '#fff'
+    btn3d.style.background   = 'transparent';    btn3d.style.color   = 'var(--text2)'
+  }
   renderCatalogo()
 }
 
@@ -1179,7 +1209,7 @@ async function loadThumb (item) {
   const container = document.getElementById(`thumb-${item.codigo}`)
   if (!container) return
 
-  // Primero verificar si hay foto real
+  // Siempre verificar si hay foto real
   const foto = await api.getFoto(cfg.rutaAretes, item.codigo)
   if (foto) {
     container.innerHTML = `
@@ -1188,7 +1218,18 @@ async function loadThumb (item) {
     return
   }
 
-  // Si no hay foto, renderizar STL con Three.js
+  // En vista Foto: mostrar placeholder sin renderizar STL
+  if (catVistaActual === 'foto') {
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;color:var(--muted);">
+        <div style="font-size:28px;opacity:.4;">📷</div>
+        <div style="font-size:9px;font-weight:700;text-align:center;">Sin foto</div>
+      </div>
+      <button class="catalogo-upload-btn" onclick="event.stopPropagation();subirFotoGrid('${item.codigo}')">📷</button>`
+    return
+  }
+
+  // En vista 3D: renderizar STL
   const stlB64 = await api.getStlBase64(cfg.rutaAretes, item.carpeta, item.archivo1)
   if (!stlB64) {
     container.innerHTML = `
@@ -1197,7 +1238,6 @@ async function loadThumb (item) {
     return
   }
 
-  // Renderizar miniatura con Three.js — devuelve imagen estática
   const imgEl = renderSTLThumb(stlB64, 160, 160)
   container.innerHTML = ''
   container.appendChild(imgEl)
@@ -1321,7 +1361,7 @@ async function openViewer (codigo, carpeta, archivo1) {
     document.getElementById('viewerLoading').style.display = 'none'
     const img = document.createElement('img')
     img.src   = `file:///${foto.replace(/\\/g,'/')}`
-    img.style = 'max-width:100%;max-height:100%;object-fit:contain;'
+    img.style = 'max-width:100%;max-height:65vh;object-fit:contain;display:block;'
     wrap.appendChild(img)
     return
   }
