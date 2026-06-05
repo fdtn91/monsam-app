@@ -304,8 +304,44 @@ ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
 })
 
 // ════════════════════════════════════════════════════════════
-//  MODELOS NUEVOS — marcador hasta que el usuario lo vea
+//  ELIMINAR MODELO
 // ════════════════════════════════════════════════════════════
+ipcMain.handle('eliminar-modelo', (_, { rutaAretes, rutaExcel, codigo }) => {
+  const result = { ok: false, fotoEliminada: false, excelActualizado: false, dbActualizado: false, error: '' }
+
+  try {
+    // 1. Eliminar foto si existe
+    const fotosDir = path.join(rutaAretes, 'fotos')
+    for (const ext of ['.jpg', '.jpeg', '.png', '.webp']) {
+      const fotoPath = path.join(fotosDir, `${codigo}${ext}`)
+      if (fs.existsSync(fotoPath)) {
+        fs.unlinkSync(fotoPath)
+        result.fotoEliminada = true
+      }
+    }
+
+    // 2. Eliminar del catálogo Excel
+    const wb = readWB(rutaExcel)
+    if (wb) {
+      const ws   = wb.Sheets[wb.SheetNames[0]]
+      const rows = toRows(ws).filter((r, i) => {
+        if (i === 0) return true  // mantener cabecera
+        return String(r[1]||'').trim() !== codigo
+      })
+      wb.Sheets[wb.SheetNames[0]] = toSheet(rows)
+      result.excelActualizado = saveWB(wb, rutaExcel)
+    }
+
+    // 3. Eliminar de modelos_nuevos si estaba
+    db.prepare('DELETE FROM modelos_nuevos WHERE codigo=?').run(codigo)
+    result.dbActualizado = true
+    result.ok = true
+  } catch (e) {
+    result.error = e.message
+  }
+
+  return result
+})
 ipcMain.handle('get-modelos-nuevos', () => {
   return db.prepare('SELECT codigo, carpeta, archivo1, added_at FROM modelos_nuevos ORDER BY added_at DESC').all()
 })

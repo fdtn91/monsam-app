@@ -1186,6 +1186,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn btn-secondary btn-sm" id="viewerUploadBtn" onclick="subirFotoViewer()">📷 Subir foto</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarModelo()">🗑 Eliminar modelo</button>
         <button class="btn btn-secondary btn-sm" onclick="closeModal('modalViewer')">✕ Cerrar</button>
       </div>
     </div>
@@ -1650,8 +1651,50 @@ async function handleDropFoto (codigo, event) {
 async function subirFotoViewer () {
   if (!viewerData) return
   await subirFotoGrid(viewerData.codigo)
-  // Reabrir el visor con la foto nueva
   openViewer(viewerData.codigo, viewerData.carpeta, viewerData.archivo1)
+}
+
+async function eliminarModelo () {
+  if (!viewerData) return
+  const { codigo, carpeta, archivo1 } = viewerData
+
+  // Confirmación con detalle
+  const confirmar = confirm(
+    `⚠️ ¿Eliminar el modelo "${codigo}"?\n\n` +
+    `Esto eliminará:\n` +
+    `• La foto (si existe)\n` +
+    `• La entrada del catálogo Excel\n` +
+    `• El marcador de "nuevo" si lo tenía\n\n` +
+    `Los archivos STL en disco NO se borran.\n` +
+    `Esta acción no se puede deshacer.`
+  )
+  if (!confirmar) return
+
+  const res = await api.eliminarModelo({
+    rutaAretes: cfg.rutaAretes,
+    rutaExcel:  cfg.rutaExcel,
+    codigo
+  })
+
+  if (res.ok) {
+    closeModal('modalViewer')
+    // Quitar del set de nuevos si estaba
+    if (modelosNuevos.has(codigo)) {
+      modelosNuevos.delete(codigo)
+      const btn = document.getElementById('btnMarcarTodos')
+      if (btn) btn.style.display = modelosNuevos.size > 0 ? 'inline-flex' : 'none'
+    }
+    // Recargar catálogo
+    await loadCatalogo()
+    await loadCatalogoCodigos()
+    const detalles = [
+      res.fotoEliminada    ? '✅ Foto eliminada'            : '— Sin foto',
+      res.excelActualizado ? '✅ Catálogo Excel actualizado' : '⚠️ Error al actualizar Excel',
+    ].join('\n')
+    alert(`Modelo "${codigo}" eliminado.\n\n${detalles}`)
+  } else {
+    alert(`❌ Error al eliminar: ${res.error}`)
+  }
 }
 
 // ════════════════════════════════════════════════════════════

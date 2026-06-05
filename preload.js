@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('api', {
   marcarModeloVisto:    (codigo) => ipcRenderer.invoke('marcar-modelo-visto',       codigo),
   marcarTodosVistos:    ()       => ipcRenderer.invoke('marcar-todos-vistos'),
   registrarModelosNuevos:(items) => ipcRenderer.invoke('registrar-modelos-nuevos',  items),
+  eliminarModelo:       (opts)   => ipcRenderer.invoke('eliminar-modelo',           opts),
   onSyncLog:      (cb)         => ipcRenderer.on('sync-log', (_, m)  => cb(m)),
   offSyncLog:     ()           => ipcRenderer.removeAllListeners('sync-log'),
 
