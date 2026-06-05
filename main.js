@@ -293,6 +293,8 @@ ipcMain.handle('agregar-a-catalogo', (_, { rutaExcel, modelos }) => {
   }
   return { ok: true, agregados }
 })
+
+ipcMain.handle('sync', async (event, { rutaBase, rutaExcel }) => {
   const send  = (type, data) => event.sender.send('sync-log', { type, data })
   const stats = { renombrados:0, agregados:0, advertencias:0, errores:0 }
   if (!fs.existsSync(rutaBase)) { send('error','Carpeta de aretes no encontrada.'); return stats }
