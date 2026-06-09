@@ -54,6 +54,17 @@ function initDB () {
     );
     CREATE INDEX IF NOT EXISTS idx_ped_estado ON pedidos (estado);
     CREATE INDEX IF NOT EXISTS idx_ped_fecha  ON pedidos (fecha_pedido);
+    CREATE TABLE IF NOT EXISTS ventas (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha      TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+      cliente    TEXT    DEFAULT '',
+      items      TEXT    NOT NULL DEFAULT '[]',
+      total      REAL    DEFAULT 0,
+      notas      TEXT    DEFAULT '',
+      origen     TEXT    DEFAULT 'pc',
+      created_at TEXT    DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_ven_fecha ON ventas (fecha);
   `)
   return db
 }
@@ -204,6 +215,38 @@ function startApiServer () {
         })))
       }
 
+      // GET /api/inventario (para ventas desde móvil)
+      if (req.method === 'GET' && route === '/api/inventario') {
+        const rows = db.prepare('SELECT sku, modelo, color, pares, costo_produccion as costoProduccion FROM inventario WHERE pares > 0 ORDER BY sku').all()
+        return json(rows)
+      }
+
+      // GET /api/precio-venta
+      if (req.method === 'GET' && route === '/api/precio-venta') {
+        const cfg2 = loadConfig()
+        return json({ precio: cfg2.precioVentaPar || 0 })
+      }
+
+      // POST /api/ventas
+      if (req.method === 'POST' && route === '/api/ventas') {
+        bodyJSON().then(body => {
+          const { cliente='', items=[], notas='' } = body
+          if (!Array.isArray(items) || !items.length) return json({ ok:false, error:'items requerido' }, 400)
+          const total  = items.reduce((s,i) => s + ((i.precio_par||0)*(i.pares||0)), 0)
+          const result = db.prepare(`INSERT INTO ventas (fecha,cliente,items,total,notas,origen) VALUES (?,?,?,?,?,'mobile')`).run(new Date().toISOString(), cliente, JSON.stringify(items), total, notas)
+          const descontar = db.transaction((items) => {
+            for (const item of items) {
+              if (!item.sku || !item.pares) continue
+              db.prepare(`UPDATE inventario SET pares=MAX(0,pares-?), updated_at=datetime('now','localtime') WHERE sku=?`).run(item.pares, item.sku)
+            }
+          })
+          descontar(items)
+          BrowserWindow.getAllWindows().forEach(w => w.webContents.send('venta-nueva', { id: result.lastInsertRowid }))
+          return json({ ok: true, id: result.lastInsertRowid, total })
+        }).catch(e => json({ ok:false, error:e.message }, 400))
+        return
+      }
+
       // POST /api/pedidos
       if (req.method === 'POST' && route === '/api/pedidos') {
         bodyJSON().then(body => {
@@ -262,6 +305,77 @@ function startApiServer () {
 // ╔══════════════════════════════════════════════════════════════════════════╗
 //  IPC — PEDIDOS
 // ╚══════════════════════════════════════════════════════════════════════════╝
+// ════════════════════════════════════════════════════════════
+//  IPC — VENTAS
+// ════════════════════════════════════════════════════════════
+ipcMain.handle('get-ventas', (_, filtro) => {
+  const { periodo } = filtro || {}
+  const now = new Date()
+  let query
+  if (periodo === 'dia') {
+    const hoy = now.toISOString().split('T')[0]
+    query = db.prepare(`SELECT * FROM ventas WHERE date(fecha) = '${hoy}' ORDER BY fecha DESC`)
+  } else if (periodo === 'semana') {
+    query = db.prepare(`SELECT * FROM ventas WHERE fecha >= datetime('now', '-7 days') ORDER BY fecha DESC`)
+  } else if (periodo === 'mes') {
+    const mes = now.toISOString().slice(0, 7)
+    query = db.prepare(`SELECT * FROM ventas WHERE strftime('%Y-%m', fecha) = '${mes}' ORDER BY fecha DESC`)
+  } else if (periodo === 'anio') {
+    const anio = now.getFullYear().toString()
+    query = db.prepare(`SELECT * FROM ventas WHERE strftime('%Y', fecha) = '${anio}' ORDER BY fecha DESC`)
+  } else {
+    query = db.prepare(`SELECT * FROM ventas ORDER BY fecha DESC LIMIT 200`)
+  }
+  return query.all().map(r => ({ ...r, items: JSON.parse(r.items || '[]') }))
+})
+
+ipcMain.handle('save-venta', (_, venta) => {
+  const items  = venta.items || []
+  const total  = items.reduce((s, i) => s + ((i.precio_par || 0) * (i.pares || 0)), 0)
+  const result = db.prepare(`
+    INSERT INTO ventas (fecha, cliente, items, total, notas, origen)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(new Date().toISOString(), venta.cliente||'', JSON.stringify(items), total, venta.notas||'', venta.origen||'pc')
+  // Descontar inventario por SKU
+  const descontar = db.transaction((items) => {
+    for (const item of items) {
+      if (!item.sku || !item.pares) continue
+      const inv = db.prepare('SELECT pares FROM inventario WHERE sku=?').get(item.sku)
+      if (inv) {
+        db.prepare(`UPDATE inventario SET pares=MAX(0,pares-?), updated_at=datetime('now','localtime') WHERE sku=?`)
+          .run(item.pares, item.sku)
+      }
+    }
+  })
+  descontar(items)
+  return { ok: true, id: result.lastInsertRowid, total }
+})
+
+ipcMain.handle('delete-venta', (_, id) => {
+  const venta = db.prepare('SELECT items FROM ventas WHERE id=?').get(id)
+  if (venta) {
+    const items = JSON.parse(venta.items || '[]')
+    const restaurar = db.transaction((items) => {
+      for (const item of items) {
+        if (!item.sku || !item.pares) continue
+        db.prepare(`UPDATE inventario SET pares=pares+?, updated_at=datetime('now','localtime') WHERE sku=?`)
+          .run(item.pares, item.sku)
+      }
+    })
+    restaurar(items)
+  }
+  db.prepare('DELETE FROM ventas WHERE id=?').run(id)
+  return { ok: true }
+})
+
+ipcMain.handle('get-precio-venta', () => {
+  const cfg = loadConfig(); return cfg.precioVentaPar || 0
+})
+ipcMain.handle('save-precio-venta', (_, precio) => {
+  const cfg = loadConfig(); cfg.precioVentaPar = parseFloat(precio) || 0; saveConfig(cfg); return true
+})
+
+// ════════════════════════════════════════════════════════════
 ipcMain.handle('get-pedidos', (_, filtro) => {
   const estado = filtro?.estado || null
   const query  = estado

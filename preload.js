@@ -66,6 +66,15 @@ contextBridge.exposeInMainWorld('api', {
   openOrcaSlicer: (orcaPath, stls) => ipcRenderer.invoke('open-orcaslicer', orcaPath, stls),
   selectOrcaExe:  (def)            => ipcRenderer.invoke('select-orca-exe', def),
 
+  // ── Ventas ───────────────────────────────────────────────
+  getVentas:       (filtro)  => ipcRenderer.invoke('get-ventas',        filtro),
+  saveVenta:       (venta)   => ipcRenderer.invoke('save-venta',        venta),
+  deleteVenta:     (id)      => ipcRenderer.invoke('delete-venta',      id),
+  getPrecioVenta:  ()        => ipcRenderer.invoke('get-precio-venta'),
+  savePrecioVenta: (precio)  => ipcRenderer.invoke('save-precio-venta', precio),
+  onVentaNueva:    (cb)      => ipcRenderer.on('venta-nueva', (_, d) => cb(d)),
+  offVentaNueva:   ()        => ipcRenderer.removeAllListeners('venta-nueva'),
+
   // ── Modelos nuevos ───────────────────────────────────────────────────────
   getModelosNuevos:      ()       => ipcRenderer.invoke('get-modelos-nuevos'),
   marcarModeloVisto:     (codigo) => ipcRenderer.invoke('marcar-modelo-visto',      codigo),

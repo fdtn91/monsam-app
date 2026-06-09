@@ -363,6 +363,12 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   font-size:12px; font-weight:700; color:var(--accent);
   background:rgba(21,81,36,.08); pointer-events:none;
 }
+/* ── Ventas ── */
+.venta-item{ display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px; }
+.venta-item:last-child{ border:none; }
+.historial-ticket{ background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px; }
+.historial-ticket-header{ display:flex;justify-content:space-between;align-items:center;margin-bottom:6px; }
+
 /* ── Cards de pedidos ── */
 .pedido-card{
   background:var(--s1); border:1px solid var(--border); border-radius:10px;
@@ -520,6 +526,11 @@ tr:hover td{ background:rgba(21,81,36,.04); }
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
       Costos
     </button>
+    <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas" style="position:relative;">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+      Ventas
+      <span id="ventasBadge" style="display:none;position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);"></span>
+    </button>
     <button class="nav-btn" onclick="showPage('pedidos')" id="nav-pedidos" style="position:relative;">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
       Pedidos
@@ -664,6 +675,18 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             <div id="printQueue" style="font-size:11px;color:var(--muted);min-height:60px;">
               Ningún modelo seleccionado
             </div>
+          </div>
+
+          <!-- Queue actual -->
+          <div class="card" style="background:var(--s2);border-color:var(--accent);">
+            <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;color:var(--accent);">
+              Queue activo
+              <span id="printSelCount" style="font-size:10px;font-family:monospace;color:var(--accent);">0 seleccionados</span>
+            </div>
+            <div id="printQueue" style="font-size:11px;color:var(--muted);min-height:40px;max-height:180px;overflow-y:auto;">
+              Ningún modelo seleccionado
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px;" onclick="limpiarSeleccion()">🗑 Limpiar queue</button>
           </div>
 
           <!-- Botón principal -->
@@ -975,6 +998,108 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PÁGINA: VENTAS
+    ══════════════════════════════════════════════════ -->
+    <div class="page" id="page-ventas">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Ventas</div>
+          <div class="page-sub">Registra ventas y descuenta el inventario automáticamente</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);">
+            <span style="font-weight:700;">Precio/par: $</span>
+            <input type="number" id="precioVentaInput" step="0.5" min="0"
+              style="width:80px;background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                     padding:4px 8px;color:var(--text);font-family:monospace;font-size:12px;outline:none;"
+              onchange="guardarPrecioVenta(this.value)"/>
+          </div>
+        </div>
+      </div>
+      <div class="page-body" style="display:grid;grid-template-columns:1fr 360px;gap:16px;overflow:hidden;">
+
+        <!-- Panel izquierdo: ticket de venta -->
+        <div style="overflow-y:auto;">
+          <div class="card">
+            <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+              Nuevo ticket
+              <button class="btn btn-secondary btn-sm" onclick="limpiarTicket()">Limpiar</button>
+            </div>
+            <!-- Búsqueda de SKU -->
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="text" id="ventaSkuBuscar" placeholder="Buscar SKU o modelo..."
+                oninput="buscarSkuVenta()"
+                style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:6px;
+                       padding:8px 11px;color:var(--text);font-family:monospace;font-size:12px;outline:none;"/>
+            </div>
+            <!-- Resultados de búsqueda -->
+            <div id="ventaSkuResultados" style="display:none;background:var(--s2);border:1px solid var(--border);
+              border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;"></div>
+            <!-- Items del ticket -->
+            <div id="ventaTicketItems" style="min-height:80px;">
+              <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px;">
+                Agrega modelos al ticket usando el buscador
+              </div>
+            </div>
+            <!-- Totales y cierre -->
+            <div id="ventaTicketTotales" style="display:none;margin-top:12px;">
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid var(--border);font-size:15px;font-weight:800;color:var(--accent);">
+                <span>TOTAL</span>
+                <span id="ventaTicketTotal">$0.00</span>
+              </div>
+              <div class="form-grid form-grid-2" style="margin-top:8px;">
+                <div class="field">
+                  <label>Cliente (opcional)</label>
+                  <input type="text" id="ventaClienteInput" placeholder="Nombre del cliente..."/>
+                </div>
+                <div class="field">
+                  <label>Notas</label>
+                  <input type="text" id="ventaNotasInput" placeholder="Notas..."/>
+                </div>
+              </div>
+              <button class="btn btn-primary" style="width:100%;margin-top:12px;height:46px;font-size:14px;"
+                onclick="cerrarTicket()">
+                ✅ Cerrar ticket y descontar inventario
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel derecho: historial de ventas -->
+        <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+          <!-- Stats por período -->
+          <div class="card">
+            <div class="card-title">Totales</div>
+            <div style="display:flex;gap:4px;margin-bottom:10px;">
+              <button class="cat-filtro active" id="ventaFiltroBtn-dia"    onclick="setVentaFiltro('dia',this)">Hoy</button>
+              <button class="cat-filtro"        id="ventaFiltroBtn-semana" onclick="setVentaFiltro('semana',this)">Semana</button>
+              <button class="cat-filtro"        id="ventaFiltroBtn-mes"    onclick="setVentaFiltro('mes',this)">Mes</button>
+              <button class="cat-filtro"        id="ventaFiltroBtn-anio"   onclick="setVentaFiltro('anio',this)">Año</button>
+            </div>
+            <div id="ventaStats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+                <div class="stat-num c-ok" id="ventaStatTotal">$0</div>
+                <div class="stat-lbl">Total vendido</div>
+              </div>
+              <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+                <div class="stat-num c-accent" id="ventaStatTickets">0</div>
+                <div class="stat-lbl">Tickets</div>
+              </div>
+            </div>
+          </div>
+          <!-- Historial -->
+          <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="card-title">Historial</div>
+            <div id="ventaHistorial" style="flex:1;overflow-y:auto;font-size:11px;">
+              <div style="color:var(--muted);text-align:center;padding:20px;">Sin ventas aún</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -3134,6 +3259,7 @@ function showPage (id) {
     loadPedidos()
     actualizarInfoConexion()
   }
+  if (id === 'ventas') { initVentas() }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3409,6 +3535,197 @@ async function agregarTodosAlQueue () {
   for (let i = 0; i < agrupacionActual.length; i++) {
     await agregarTodasPlacasGrupo(i)
   }
+}
+
+// ════════════════════════════════════════════════════════════
+//  VENTAS
+// ════════════════════════════════════════════════════════════
+let ticketItems    = []
+let ventaFiltro    = 'dia'
+let precioVenta    = 0
+
+async function initVentas () {
+  precioVenta = await api.getPrecioVenta()
+  document.getElementById('precioVentaInput').value = precioVenta
+  await cargarVentas()
+}
+
+async function guardarPrecioVenta (val) {
+  precioVenta = parseFloat(val) || 0
+  await api.savePrecioVenta(precioVenta)
+  actualizarTicketTotal()
+}
+
+async function setVentaFiltro (filtro, btn) {
+  ventaFiltro = filtro
+  document.querySelectorAll('[id^="ventaFiltroBtn-"]').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  await cargarVentas()
+}
+
+async function cargarVentas () {
+  const ventas = await api.getVentas({ periodo: ventaFiltro })
+  // Stats
+  const total   = ventas.reduce((s, v) => s + (v.total || 0), 0)
+  document.getElementById('ventaStatTotal').textContent   = '$' + total.toFixed(2)
+  document.getElementById('ventaStatTickets').textContent = ventas.length
+
+  // Historial
+  const hist = document.getElementById('ventaHistorial')
+  if (!ventas.length) {
+    hist.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;">Sin ventas en este período</div>'
+    return
+  }
+  hist.innerHTML = ventas.map(v => {
+    const fecha = new Date(v.fecha).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+    const items = v.items || []
+    return `
+    <div class="historial-ticket">
+      <div class="historial-ticket-header">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);">${v.cliente || 'Sin nombre'}</div>
+          <div style="font-size:9px;color:var(--muted);font-family:monospace;">${fecha}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-family:monospace;font-weight:700;color:var(--ok);">$${(v.total||0).toFixed(2)}</span>
+          <button class="btn btn-danger btn-sm" onclick="eliminarVenta(${v.id})" style="padding:2px 7px;font-size:10px;">🗑</button>
+        </div>
+      </div>
+      ${items.map(i => `<div style="font-size:10px;color:var(--text2);padding:1px 0;">${i.sku} · ${i.pares}p · $${((i.precio_par||0)*i.pares).toFixed(2)}</div>`).join('')}
+    </div>`
+  }).join('')
+}
+
+function buscarSkuVenta () {
+  const q   = (document.getElementById('ventaSkuBuscar').value || '').toLowerCase()
+  const res = document.getElementById('ventaSkuResultados')
+  if (!q) { res.style.display = 'none'; return }
+  const matches = inventario.filter(i => i.pares > 0 && (i.sku.toLowerCase().includes(q) || i.modelo.toLowerCase().includes(q) || i.color.toLowerCase().includes(q)))
+  if (!matches.length) { res.style.display = 'none'; return }
+  res.style.display = 'block'
+  res.innerHTML = matches.map(i => `
+    <div onclick="agregarAlTicket('${i.sku}','${i.modelo}','${i.color}',${i.pares})"
+      style="padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+             border-bottom:1px solid var(--border);font-size:12px;"
+      onmouseover="this.style.background='rgba(21,81,36,.06)'" onmouseout="this.style.background=''">
+      <div>
+        <span style="font-family:monospace;font-weight:700;color:var(--accent);">${i.sku}</span>
+        <span style="color:var(--text2);margin-left:8px;">${i.modelo} · ${i.color}</span>
+      </div>
+      <span style="font-size:10px;color:var(--muted);">${i.pares}p disponibles</span>
+    </div>`).join('')
+}
+
+function agregarAlTicket (sku, modelo, color, disponibles) {
+  document.getElementById('ventaSkuBuscar').value = ''
+  document.getElementById('ventaSkuResultados').style.display = 'none'
+  const existente = ticketItems.find(i => i.sku === sku)
+  if (existente) {
+    if (existente.pares < disponibles) existente.pares++
+    else { alert(`Stock máximo: ${disponibles} pares`); return }
+  } else {
+    ticketItems.push({ sku, modelo, color, pares: 1, precio_par: precioVenta, disponibles })
+  }
+  renderTicket()
+}
+
+function renderTicket () {
+  const cont = document.getElementById('ventaTicketItems')
+  const tot  = document.getElementById('ventaTicketTotales')
+
+  if (!ticketItems.length) {
+    cont.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px;">Agrega modelos al ticket usando el buscador</div>'
+    tot.style.display = 'none'
+    return
+  }
+
+  tot.style.display = 'block'
+  cont.innerHTML = ticketItems.map((item, idx) => `
+    <div class="venta-item">
+      <div style="flex:1;">
+        <div style="font-family:monospace;font-weight:700;color:var(--accent);font-size:12px;">${item.sku}</div>
+        <div style="font-size:10px;color:var(--text2);">${item.modelo} · ${item.color}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button onclick="cambiarParesTiket(${idx},-1)" style="width:24px;height:24px;border-radius:12px;border:1px solid var(--border);background:var(--s2);cursor:pointer;font-size:14px;line-height:1;">−</button>
+        <span style="font-family:monospace;font-weight:700;min-width:20px;text-align:center;">${item.pares}</span>
+        <button onclick="cambiarParesTiket(${idx},1)" style="width:24px;height:24px;border-radius:12px;border:1px solid var(--border);background:var(--s2);cursor:pointer;font-size:14px;line-height:1;">+</button>
+      </div>
+      <div style="min-width:60px;text-align:right;">
+        <input type="number" value="${item.precio_par}" step="0.5" min="0"
+          onchange="cambiarPrecioItem(${idx}, this.value)"
+          style="width:60px;background:var(--s2);border:1px solid var(--border);border-radius:4px;
+                 padding:3px 5px;color:var(--text);font-family:monospace;font-size:11px;outline:none;text-align:right;"/>
+        <div style="font-size:9px;color:var(--muted);text-align:right;">$${((item.precio_par||0)*item.pares).toFixed(2)}</div>
+      </div>
+      <button onclick="quitarDelTicket(${idx})" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:14px;">🗑</button>
+    </div>`).join('')
+
+  actualizarTicketTotal()
+}
+
+function cambiarParesTiket (idx, delta) {
+  const item = ticketItems[idx]
+  if (!item) return
+  const nuevo = item.pares + delta
+  if (nuevo <= 0) { ticketItems.splice(idx, 1) }
+  else if (nuevo > item.disponibles) { alert(`Máximo ${item.disponibles} pares disponibles`); return }
+  else { item.pares = nuevo }
+  renderTicket()
+}
+
+function cambiarPrecioItem (idx, val) {
+  if (ticketItems[idx]) { ticketItems[idx].precio_par = parseFloat(val) || 0; actualizarTicketTotal() }
+}
+
+function quitarDelTicket (idx) {
+  ticketItems.splice(idx, 1); renderTicket()
+}
+
+function limpiarTicket () {
+  ticketItems = []
+  document.getElementById('ventaSkuBuscar').value = ''
+  document.getElementById('ventaClienteInput').value = ''
+  document.getElementById('ventaNotasInput').value = ''
+  renderTicket()
+}
+
+function actualizarTicketTotal () {
+  const total = ticketItems.reduce((s, i) => s + (i.precio_par || 0) * i.pares, 0)
+  const el = document.getElementById('ventaTicketTotal')
+  if (el) el.textContent = '$' + total.toFixed(2)
+}
+
+async function cerrarTicket () {
+  if (!ticketItems.length) return
+  const total = ticketItems.reduce((s, i) => s + (i.precio_par||0)*i.pares, 0)
+  if (!confirm(`¿Cerrar ticket?\n\nTotal: $${total.toFixed(2)}\n${ticketItems.length} artículo(s)\n\nEl inventario se descontará automáticamente.`)) return
+
+  const venta = {
+    cliente: document.getElementById('ventaClienteInput').value.trim(),
+    notas:   document.getElementById('ventaNotasInput').value.trim(),
+    items:   ticketItems.map(i => ({ sku: i.sku, modelo: i.modelo, color: i.color, pares: i.pares, precio_par: i.precio_par, subtotal: i.precio_par * i.pares })),
+    origen: 'pc'
+  }
+
+  const res = await api.saveVenta(venta)
+  if (res.ok) {
+    limpiarTicket()
+    await loadInventario()
+    await cargarVentas()
+    // Feedback badge
+    const badge = document.getElementById('ventasBadge')
+    if (badge) { badge.style.display = 'block'; setTimeout(() => badge.style.display = 'none', 3000) }
+  } else {
+    alert('Error al guardar la venta')
+  }
+}
+
+async function eliminarVenta (id) {
+  if (!confirm('¿Eliminar esta venta? Se restaurará el inventario.')) return
+  await api.deleteVenta(id)
+  await loadInventario()
+  await cargarVentas()
 }
 
 async function loadPedidos () {
