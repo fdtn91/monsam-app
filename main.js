@@ -227,6 +227,20 @@ function startApiServer () {
         return json({ precio: cfg2.precioVentaPar || 0 })
       }
 
+      // GET /api/config (datos públicos del servidor para la app móvil)
+      if (req.method === 'GET' && route === '/api/config') {
+        const cfg2 = loadConfig()
+        return json({
+          marca:           cfg2.marca            || 'MONSAM',
+          direccion:       cfg2.ticketDireccion  || '',
+          telefono:        cfg2.ticketTelefono   || '',
+          razonSocial:     cfg2.ticketRazonSocial|| '',
+          rfc:             cfg2.ticketRFC        || '',
+          leyenda:         cfg2.ticketLeyenda    || '',
+          precioVentaPar:  cfg2.precioVentaPar   || 0,
+        })
+      }
+
       // POST /api/ventas
       if (req.method === 'POST' && route === '/api/ventas') {
         bodyJSON().then(body => {
