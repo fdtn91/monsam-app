@@ -376,6 +376,16 @@ ipcMain.handle('save-precio-venta', (_, precio) => {
 })
 
 // ════════════════════════════════════════════════════════════
+// Crear pedido desde PC (venta inmediata)
+ipcMain.handle('crear-pedido-pc', (_, pedido) => {
+  const items  = pedido.items || []
+  const result = db.prepare(`
+    INSERT INTO pedidos (fecha_pedido, cliente, notas, items, estado)
+    VALUES (datetime('now','localtime'), ?, ?, ?, 'listo')
+  `).run(pedido.cliente||'', pedido.notas||'', JSON.stringify(items))
+  return { ok: true, id: result.lastInsertRowid }
+})
+
 ipcMain.handle('get-pedidos', (_, filtro) => {
   const estado = filtro?.estado || null
   const query  = estado
@@ -811,6 +821,10 @@ ipcMain.handle('get-inventario', () => {
            pares, costo_produccion as costoProduccion
     FROM inventario ORDER BY sku
   `).all()
+})
+
+ipcMain.handle('get-inventario-venta', () => {
+  return db.prepare('SELECT sku, modelo, color, codigo_color as codigoColor, pares, costo_produccion as costoProduccion FROM inventario WHERE pares > 0 ORDER BY sku').all()
 })
 
 ipcMain.handle('save-inventario', (_, __, item) => {

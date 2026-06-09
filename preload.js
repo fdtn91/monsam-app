@@ -66,6 +66,9 @@ contextBridge.exposeInMainWorld('api', {
   openOrcaSlicer: (orcaPath, stls) => ipcRenderer.invoke('open-orcaslicer', orcaPath, stls),
   selectOrcaExe:  (def)            => ipcRenderer.invoke('select-orca-exe', def),
 
+  crearPedidoPc:   (pedido)  => ipcRenderer.invoke('crear-pedido-pc',    pedido),
+  getInventarioVenta: ()     => ipcRenderer.invoke('get-inventario-venta'),
+
   // ── Ventas ───────────────────────────────────────────────
   getVentas:       (filtro)  => ipcRenderer.invoke('get-ventas',        filtro),
   saveVenta:       (venta)   => ipcRenderer.invoke('save-venta',        venta),

@@ -1027,7 +1027,10 @@ tr:hover td{ background:rgba(21,81,36,.04); }
           <div class="card">
             <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
               Nuevo ticket
-              <button class="btn btn-secondary btn-sm" onclick="limpiarTicket()">Limpiar</button>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-secondary btn-sm" onclick="cargarPedidoEnTicket()">📋 Desde pedido</button>
+                <button class="btn btn-secondary btn-sm" onclick="limpiarTicket()">Limpiar</button>
+              </div>
             </div>
             <!-- Búsqueda de SKU -->
             <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -1047,7 +1050,29 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             </div>
             <!-- Totales y cierre -->
             <div id="ventaTicketTotales" style="display:none;margin-top:12px;">
-              <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid var(--border);font-size:15px;font-weight:800;color:var(--accent);">
+              <!-- Descuento -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);">
+                <span style="font-size:12px;color:var(--text2);">Subtotal</span>
+                <span style="font-family:monospace;font-size:12px;" id="ventaTicketSubtotal">$0.00</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);">
+                  Descuento
+                  <input type="number" id="ventaDescuentoPct" value="0" min="0" max="100" step="1"
+                    oninput="actualizarTicketTotal()"
+                    style="width:50px;background:var(--s2);border:1px solid var(--border);border-radius:4px;
+                           padding:2px 6px;color:var(--text);font-family:monospace;font-size:11px;outline:none;text-align:center;"/>
+                  <span style="font-size:11px;">%</span>
+                </div>
+                <span style="font-family:monospace;font-size:12px;color:var(--error);" id="ventaTicketDescuento">-$0.00</span>
+              </div>
+              <!-- IVA (solo si hay RFC) -->
+              <div id="ventaIvaRow" style="display:none;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:12px;color:var(--text2);">IVA (16%)</span>
+                <span style="font-family:monospace;font-size:12px;color:var(--warn);" id="ventaTicketIva">$0.00</span>
+              </div>
+              <!-- Total final -->
+              <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:15px;font-weight:800;color:var(--accent);">
                 <span>TOTAL</span>
                 <span id="ventaTicketTotal">$0.00</span>
               </div>
@@ -1061,17 +1086,21 @@ tr:hover td{ background:rgba(21,81,36,.04); }
                   <input type="text" id="ventaNotasInput" placeholder="Notas..."/>
                 </div>
               </div>
-              <button class="btn btn-primary" style="width:100%;margin-top:12px;height:46px;font-size:14px;"
-                onclick="cerrarTicket()">
-                ✅ Cerrar ticket y descontar inventario
-              </button>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="imprimirTicket()">
+                  🖨 Imprimir ticket
+                </button>
+                <button class="btn btn-primary" style="flex:2;height:46px;font-size:14px;"
+                  onclick="cerrarTicket()">
+                  ✅ Cerrar ticket
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Panel derecho: historial de ventas -->
         <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
-          <!-- Stats por período -->
           <div class="card">
             <div class="card-title">Totales</div>
             <div style="display:flex;gap:4px;margin-bottom:10px;">
@@ -1091,7 +1120,6 @@ tr:hover td{ background:rgba(21,81,36,.04); }
               </div>
             </div>
           </div>
-          <!-- Historial -->
           <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
             <div class="card-title">Historial</div>
             <div id="ventaHistorial" style="flex:1;overflow-y:auto;font-size:11px;">
@@ -1119,6 +1147,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
           </div>
           <button class="btn btn-secondary btn-sm" onclick="loadPedidos()">↻ Actualizar</button>
           <button class="btn btn-secondary btn-sm" onclick="marcarTodosVistosP()">✓ Marcar todos vistos</button>
+          <button class="btn btn-secondary btn-sm" onclick="openModalNuevoPedidoPC()">+ Nuevo pedido (PC)</button>
           <button class="btn btn-primary btn-sm" onclick="agruparPedidos()">⊞ Agrupar pedidos</button>
         </div>
       </div>
@@ -1248,6 +1277,33 @@ tr:hover td{ background:rgba(21,81,36,.04); }
             <div style="margin-top:12px;padding:10px 14px;background:rgba(9,105,218,.06);border:1px solid rgba(9,105,218,.2);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.7;">
               📱 Abre la app en tu celular → <strong>Configuración</strong> → ingresa la URL de arriba.<br/>
               ⚠️ El celular y la PC deben estar en la <strong>misma red WiFi</strong>.
+            </div>
+          </div>
+
+          <!-- ── Ticket de venta ── -->
+          <div class="card" style="grid-column:1/-1;">
+            <div class="card-title">Ticket de venta</div>
+            <div class="form-grid form-grid-2">
+              <div class="field">
+                <label>Dirección</label>
+                <input type="text" id="cfgTicketDireccion" placeholder="Calle, número, ciudad..."/>
+              </div>
+              <div class="field">
+                <label>Teléfono</label>
+                <input type="text" id="cfgTicketTelefono" placeholder="+52 xxx xxx xxxx"/>
+              </div>
+              <div class="field">
+                <label>Razón social</label>
+                <input type="text" id="cfgTicketRazonSocial" placeholder="Mi Empresa S.A. de C.V."/>
+              </div>
+              <div class="field">
+                <label>RFC</label>
+                <input type="text" id="cfgTicketRFC" placeholder="XXXX000000XXX"/>
+              </div>
+              <div class="field" style="grid-column:1/-1;">
+                <label>Leyenda al final del ticket</label>
+                <input type="text" id="cfgTicketLeyenda" placeholder="Gracias por su compra · No se aceptan devoluciones después de 7 días"/>
+              </div>
             </div>
           </div>
 
@@ -1501,6 +1557,42 @@ tr:hover td{ background:rgba(21,81,36,.04); }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modalAgrupar')">Cerrar</button>
       <button class="btn btn-primary" onclick="agregarTodosAlQueue()">🖨 Agregar todo al queue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: NUEVO PEDIDO DESDE PC
+══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalNuevoPedidoPC">
+  <div class="modal" style="width:620px;max-width:96vw;">
+    <div class="modal-title">Nuevo pedido (PC)</div>
+    <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Cliente</label>
+        <input type="text" id="pcPedidoCliente" placeholder="Nombre del cliente..."/>
+      </div>
+      <div class="field">
+        <label>Notas</label>
+        <input type="text" id="pcPedidoNotas" placeholder="Notas opcionales..."/>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <input type="text" id="pcPedidoBuscar" placeholder="Buscar SKU o modelo..."
+        oninput="buscarSkuPedidoPC()"
+        style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:6px;
+               padding:8px 11px;color:var(--text);font-family:monospace;font-size:12px;outline:none;"/>
+    </div>
+    <div id="pcPedidoResultados" style="display:none;background:var(--s2);border:1px solid var(--border);
+      border-radius:8px;max-height:160px;overflow-y:auto;margin-bottom:12px;"></div>
+    <div id="pcPedidoItems" style="min-height:60px;margin-bottom:12px;">
+      <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">
+        Busca y agrega modelos al pedido
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalNuevoPedidoPC')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarPedidoPC()">✅ Crear pedido (estado: Listo)</button>
     </div>
   </div>
 </div>
@@ -2109,6 +2201,12 @@ function renderConfig () {
   setPath('pExcelVal',  cfg.rutaExcel)
   setPath('pGcodesVal', cfg.rutaGcodes)
   setPath('pOrcaVal',   cfg.orcaSlicerPath)
+  // Ticket de venta
+  document.getElementById('cfgTicketDireccion').value   = cfg.ticketDireccion   || ''
+  document.getElementById('cfgTicketTelefono').value    = cfg.ticketTelefono    || ''
+  document.getElementById('cfgTicketRazonSocial').value = cfg.ticketRazonSocial || ''
+  document.getElementById('cfgTicketRFC').value         = cfg.ticketRFC         || ''
+  document.getElementById('cfgTicketLeyenda').value     = cfg.ticketLeyenda     || ''
   // Rellenar info de conexión móvil
   actualizarInfoConexion()
 }
@@ -2124,6 +2222,11 @@ async function saveConfig () {
   cfg.costoEmpaque     = parseFloat(document.getElementById('cfgEmpaque').value)     || 0
   // Nuevos campos impresora
   cfg.moonrakerIp      = document.getElementById('cfgMoonrakerIp').value.trim()
+  cfg.ticketDireccion   = document.getElementById('cfgTicketDireccion').value.trim()
+  cfg.ticketTelefono    = document.getElementById('cfgTicketTelefono').value.trim()
+  cfg.ticketRazonSocial = document.getElementById('cfgTicketRazonSocial').value.trim()
+  cfg.ticketRFC         = document.getElementById('cfgTicketRFC').value.trim()
+  cfg.ticketLeyenda     = document.getElementById('cfgTicketLeyenda').value.trim()
   cfg.zOffset          = parseFloat(document.getElementById('cfgZOffset').value)     || 0.190
   cfg.maxModelosPlaca  = parseInt(document.getElementById('cfgMaxModelos').value)    || 7
   await api.saveConfig(cfg)
@@ -3691,20 +3794,47 @@ function limpiarTicket () {
 }
 
 function actualizarTicketTotal () {
-  const total = ticketItems.reduce((s, i) => s + (i.precio_par || 0) * i.pares, 0)
-  const el = document.getElementById('ventaTicketTotal')
-  if (el) el.textContent = '$' + total.toFixed(2)
+  const subtotal  = ticketItems.reduce((s, i) => s + (i.precio_par || 0) * i.pares, 0)
+  const descPct   = parseFloat(document.getElementById('ventaDescuentoPct')?.value) || 0
+  const descuento = subtotal * (descPct / 100)
+  const base      = subtotal - descuento
+  const tieneRFC  = !!(cfg.ticketRFC && cfg.ticketRFC.trim())
+  const iva       = tieneRFC ? base * 0.16 : 0
+  const total     = base + iva
+
+  const elSub  = document.getElementById('ventaTicketSubtotal')
+  const elDesc = document.getElementById('ventaTicketDescuento')
+  const elIva  = document.getElementById('ventaTicketIva')
+  const elTot  = document.getElementById('ventaTicketTotal')
+  const ivaRow = document.getElementById('ventaIvaRow')
+
+  if (elSub)  elSub.textContent  = '$' + subtotal.toFixed(2)
+  if (elDesc) elDesc.textContent = '-$' + descuento.toFixed(2)
+  if (elIva)  elIva.textContent  = '$' + iva.toFixed(2)
+  if (elTot)  elTot.textContent  = '$' + total.toFixed(2)
+  if (ivaRow) ivaRow.style.display = tieneRFC ? 'flex' : 'none'
 }
 
 async function cerrarTicket () {
   if (!ticketItems.length) return
-  const total = ticketItems.reduce((s, i) => s + (i.precio_par||0)*i.pares, 0)
-  if (!confirm(`¿Cerrar ticket?\n\nTotal: $${total.toFixed(2)}\n${ticketItems.length} artículo(s)\n\nEl inventario se descontará automáticamente.`)) return
+  const subtotal  = ticketItems.reduce((s, i) => s + (i.precio_par||0)*i.pares, 0)
+  const descPct   = parseFloat(document.getElementById('ventaDescuentoPct')?.value) || 0
+  const descuento = subtotal * (descPct / 100)
+  const base      = subtotal - descuento
+  const tieneRFC  = !!(cfg.ticketRFC && cfg.ticketRFC.trim())
+  const iva       = tieneRFC ? base * 0.16 : 0
+  const total     = base + iva
+
+  if (!confirm(`¿Cerrar ticket?\n\nSubtotal: $${subtotal.toFixed(2)}\nDescuento (${descPct}%): -$${descuento.toFixed(2)}${tieneRFC?`\nIVA (16%): $${iva.toFixed(2)}`:''}\nTOTAL: $${total.toFixed(2)}\n\nEl inventario se descontará automáticamente.`)) return
 
   const venta = {
-    cliente: document.getElementById('ventaClienteInput').value.trim(),
-    notas:   document.getElementById('ventaNotasInput').value.trim(),
-    items:   ticketItems.map(i => ({ sku: i.sku, modelo: i.modelo, color: i.color, pares: i.pares, precio_par: i.precio_par, subtotal: i.precio_par * i.pares })),
+    cliente:  document.getElementById('ventaClienteInput').value.trim(),
+    notas:    document.getElementById('ventaNotasInput').value.trim(),
+    items:    ticketItems.map(i => ({ sku:i.sku, modelo:i.modelo, color:i.color, pares:i.pares, precio_par:i.precio_par, subtotal:i.precio_par*i.pares })),
+    descuento_pct: descPct,
+    descuento_monto: descuento,
+    iva,
+    total,
     origen: 'pc'
   }
 
@@ -3713,7 +3843,6 @@ async function cerrarTicket () {
     limpiarTicket()
     await loadInventario()
     await cargarVentas()
-    // Feedback badge
     const badge = document.getElementById('ventasBadge')
     if (badge) { badge.style.display = 'block'; setTimeout(() => badge.style.display = 'none', 3000) }
   } else {
@@ -3726,6 +3855,204 @@ async function eliminarVenta (id) {
   await api.deleteVenta(id)
   await loadInventario()
   await cargarVentas()
+}
+
+// ════════════════════════════════════════════════════════════
+//  PEDIDO DESDE PC
+// ════════════════════════════════════════════════════════════
+let pcPedidoItems = []
+
+function openModalNuevoPedidoPC () {
+  pcPedidoItems = []
+  document.getElementById('pcPedidoCliente').value = ''
+  document.getElementById('pcPedidoNotas').value   = ''
+  document.getElementById('pcPedidoBuscar').value  = ''
+  document.getElementById('pcPedidoResultados').style.display = 'none'
+  renderPcPedidoItems()
+  openModal('modalNuevoPedidoPC')
+}
+
+function buscarSkuPedidoPC () {
+  const q   = (document.getElementById('pcPedidoBuscar').value || '').toLowerCase()
+  const res = document.getElementById('pcPedidoResultados')
+  if (!q) { res.style.display = 'none'; return }
+  const matches = inventario.filter(i => i.pares > 0 && (i.sku.toLowerCase().includes(q) || i.modelo.toLowerCase().includes(q) || i.color.toLowerCase().includes(q)))
+  if (!matches.length) { res.style.display = 'none'; return }
+  res.style.display = 'block'
+  res.innerHTML = matches.map(i => `
+    <div onclick="agregarAlPcPedido('${i.sku}','${i.modelo}','${i.color}',${i.pares})"
+      style="padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;
+             border-bottom:1px solid var(--border);font-size:12px;"
+      onmouseover="this.style.background='rgba(21,81,36,.06)'" onmouseout="this.style.background=''">
+      <div>
+        <span style="font-family:monospace;font-weight:700;color:var(--accent);">${i.sku}</span>
+        <span style="color:var(--text2);margin-left:8px;">${i.modelo} · ${i.color}</span>
+      </div>
+      <span style="font-size:10px;color:var(--muted);">${i.pares}p</span>
+    </div>`).join('')
+}
+
+function agregarAlPcPedido (sku, modelo, color, disponibles) {
+  document.getElementById('pcPedidoBuscar').value = ''
+  document.getElementById('pcPedidoResultados').style.display = 'none'
+  const existente = pcPedidoItems.find(i => i.sku === sku)
+  if (existente) { if (existente.pares < disponibles) existente.pares++ }
+  else pcPedidoItems.push({ sku, modelo, color, pares: 1, disponibles })
+  renderPcPedidoItems()
+}
+
+function renderPcPedidoItems () {
+  const cont = document.getElementById('pcPedidoItems')
+  if (!pcPedidoItems.length) {
+    cont.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Busca y agrega modelos al pedido</div>'
+    return
+  }
+  cont.innerHTML = pcPedidoItems.map((item, idx) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+      <div style="flex:1;">
+        <div style="font-family:monospace;font-weight:700;color:var(--accent);">${item.sku}</div>
+        <div style="font-size:10px;color:var(--text2);">${item.modelo} · ${item.color}</div>
+      </div>
+      <button onclick="pcPedidoItems[${idx}].pares=Math.max(1,pcPedidoItems[${idx}].pares-1);renderPcPedidoItems()" style="width:22px;height:22px;border-radius:11px;border:1px solid var(--border);background:var(--s2);cursor:pointer;">−</button>
+      <span style="font-family:monospace;font-weight:700;min-width:20px;text-align:center;">${item.pares}</span>
+      <button onclick="if(pcPedidoItems[${idx}].pares<pcPedidoItems[${idx}].disponibles)pcPedidoItems[${idx}].pares++;renderPcPedidoItems()" style="width:22px;height:22px;border-radius:11px;border:1px solid var(--border);background:var(--s2);cursor:pointer;">+</button>
+      <button onclick="pcPedidoItems.splice(${idx},1);renderPcPedidoItems()" style="background:none;border:none;cursor:pointer;color:var(--error);">🗑</button>
+    </div>`).join('')
+}
+
+async function guardarPedidoPC () {
+  if (!pcPedidoItems.length) { alert('Agrega al menos un modelo al pedido.'); return }
+  const pedido = {
+    cliente: document.getElementById('pcPedidoCliente').value.trim(),
+    notas:   document.getElementById('pcPedidoNotas').value.trim(),
+    items:   pcPedidoItems.map(i => ({ codigo: i.sku, color: i.color, pares: i.pares }))
+  }
+  const res = await api.crearPedidoPc(pedido)
+  if (res.ok) {
+    closeModal('modalNuevoPedidoPC')
+    await loadPedidos()
+    alert(`✅ Pedido creado con ID #${res.id} (estado: Listo)`)
+  } else {
+    alert('Error al crear el pedido')
+  }
+}
+
+// ── Cargar pedido terminado en ticket de venta ────────────────────────────
+async function cargarPedidoEnTicket () {
+  const todos      = await api.getPedidos(null)
+  const terminados = todos.filter(p => p.estado === 'listo' || p.estado === 'entregado')
+  if (!terminados.length) {
+    alert('No hay pedidos con estado "Listo" o "Entregado".\nCambia el estado del pedido primero.')
+    return
+  }
+  const opciones = terminados.map((p, i) => {
+    const fecha = new Date(p.fecha_pedido).toLocaleDateString('es-MX')
+    return `${i + 1}. #${p.id} · ${p.cliente || 'Sin nombre'} · ${fecha} · ${(p.items||[]).length} modelos`
+  }).join('\n')
+  const input = prompt(`Selecciona el número del pedido para cargar al ticket:\n\n${opciones}`)
+  if (!input) return
+  const idx = parseInt(input.trim()) - 1
+  if (isNaN(idx) || idx < 0 || idx >= terminados.length) { alert('Número inválido'); return }
+
+  const pedido = terminados[idx]
+  // Limpiar ticket actual
+  ticketItems = []
+  // Cargar cliente del pedido
+  if (pedido.cliente) document.getElementById('ventaClienteInput').value = pedido.cliente
+
+  // Agregar items al ticket buscando en inventario
+  for (const item of (pedido.items || [])) {
+    const codigo = item.codigo || item.sku
+    const inv    = inventario.find(i => i.sku === codigo || i.modelo === codigo)
+    if (inv) {
+      ticketItems.push({
+        sku:       inv.sku,
+        modelo:    inv.modelo,
+        color:     inv.color,
+        pares:     item.pares || 1,
+        precio_par: precioVenta,
+        disponibles: inv.pares
+      })
+    } else {
+      // Item del pedido no encontrado en inventario — agregar con datos del pedido
+      ticketItems.push({
+        sku:       codigo,
+        modelo:    codigo,
+        color:     item.color || '',
+        pares:     item.pares || 1,
+        precio_par: precioVenta,
+        disponibles: 9999
+      })
+    }
+  }
+
+  renderTicket()
+  if (!ticketItems.length) alert('No se encontraron modelos del pedido en el inventario.')
+}
+
+// ── Imprimir ticket ────────────────────────────────────────────────────────
+function imprimirTicket () {
+  if (!ticketItems.length) return
+
+  const subtotal  = ticketItems.reduce((s, i) => s + (i.precio_par||0)*i.pares, 0)
+  const descPct   = parseFloat(document.getElementById('ventaDescuentoPct')?.value) || 0
+  const descuento = subtotal * (descPct / 100)
+  const base      = subtotal - descuento
+  const tieneRFC  = !!(cfg.ticketRFC && cfg.ticketRFC.trim())
+  const iva       = tieneRFC ? base * 0.16 : 0
+  const total     = base + iva
+  const cliente   = document.getElementById('ventaClienteInput').value.trim()
+  const fecha     = new Date().toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' })
+
+  const html = `
+    <!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Ticket de venta</title>
+    <style>
+      body { font-family: 'Courier New', monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 16px; }
+      h2   { text-align: center; font-size: 15px; margin: 0 0 4px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 12px; }
+      hr   { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+      table{ width: 100%; border-collapse: collapse; font-size: 11px; }
+      th   { text-align: left; font-size: 10px; color: #666; padding: 2px 0; }
+      td   { padding: 3px 0; }
+      .right { text-align: right; }
+      .total-row { font-weight: bold; font-size: 13px; }
+      .footer { text-align: center; font-size: 10px; color: #666; margin-top: 12px; }
+    </style></head><body>
+    <h2>${cfg.marca || 'MONSAM'}</h2>
+    ${cfg.ticketRazonSocial && tieneRFC ? `<div class="sub">${cfg.ticketRazonSocial}</div>` : ''}
+    ${tieneRFC ? `<div class="sub">RFC: ${cfg.ticketRFC}</div>` : ''}
+    ${cfg.ticketDireccion ? `<div class="sub">${cfg.ticketDireccion}</div>` : ''}
+    ${cfg.ticketTelefono  ? `<div class="sub">Tel: ${cfg.ticketTelefono}</div>` : ''}
+    <hr/>
+    <div style="font-size:11px;">${fecha}</div>
+    ${cliente ? `<div style="font-size:11px;">Cliente: ${cliente}</div>` : ''}
+    <hr/>
+    <table>
+      <tr><th>SKU</th><th class="right">Pares</th><th class="right">P/u</th><th class="right">Total</th></tr>
+      ${ticketItems.map(i => `
+      <tr>
+        <td>${i.sku}</td>
+        <td class="right">${i.pares}</td>
+        <td class="right">$${(i.precio_par||0).toFixed(2)}</td>
+        <td class="right">$${((i.precio_par||0)*i.pares).toFixed(2)}</td>
+      </tr>`).join('')}
+    </table>
+    <hr/>
+    <table>
+      <tr><td>Subtotal</td><td class="right">$${subtotal.toFixed(2)}</td></tr>
+      ${descPct > 0 ? `<tr><td>Descuento (${descPct}%)</td><td class="right">-$${descuento.toFixed(2)}</td></tr>` : ''}
+      ${tieneRFC ? `<tr><td>IVA (16%)</td><td class="right">$${iva.toFixed(2)}</td></tr>` : ''}
+      <tr class="total-row"><td>TOTAL</td><td class="right">$${total.toFixed(2)}</td></tr>
+    </table>
+    ${cfg.ticketLeyenda ? `<hr/><div class="footer">${cfg.ticketLeyenda}</div>` : ''}
+    </body></html>`
+
+  const win = window.open('', '_blank', 'width=380,height=600')
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  setTimeout(() => { win.print(); win.close() }, 300)
 }
 
 async function loadPedidos () {
