@@ -2,7 +2,7 @@
 
 ## Stack
 - **Electron** (frame:false)
-- **better-sqlite3 v9.4.3** (compatible con Node 16 + electron-rebuild)
+- **better-sqlite3 v9.4.3**
 - **Three.js** v0.160 (CDN) para render 3D de STL
 - **XLSX** para catálogo de STL (Excel)
 - Node.js v16.13.2
@@ -19,66 +19,40 @@
 - Campo en config.json: `rutaDB`
 - Tablas: `filamentos`, `inventario`, `clientes`, `costos`, `pedidos`, `modelos_nuevos`, `ventas`
 - `filamentos` es propiedad de e500-app — monsam solo lee
-- Polling de stock cada 10 segundos via `refresh-stock`
-
-## Carpetas importantes
-- `rutaAretes`: `F:\DISEÑOS\Modelos 3D\aretes`
-- Fotos: `F:\DISEÑOS\Modelos 3D\aretes\fotos\{CODIGO}.jpg`
-- STLs: `F:\DISEÑOS\Modelos 3D\aretes\{CARPETA}\{archivo}.stl`
-- Excel catálogo: `F:\DISEÑOS\Modelos 3D\aretes\Catalogo_Aretes_3D.xlsx`
+- Colores degradados guardados como `hex1|hex2|hex3` en campo `color_hex`
 
 ## API REST (puerto 4000) — endpoints para app móvil
 - GET  /api/ping
 - GET  /api/catalogo
 - GET  /api/foto/:codigo
-- GET  /api/colores
+- GET  /api/colores  ← devuelve hex con formato hex1|hex2|hex3 para degradados
 - GET  /api/inventario
 - GET  /api/precio-venta
-- GET  /api/config  ← datos del ticket (marca, RFC, dirección, etc.)
+- GET  /api/config
 - POST /api/pedidos
 - GET  /api/pedidos
 - PUT  /api/pedidos/:id/estado
-- POST /api/ventas  ← registra venta y descuenta inventario
+- POST /api/ventas
 
 ## Código de colores (SKU)
-- Primeras 3 letras del color puro (ignorando tipo y marca)
-- Palabras ignoradas: PLA, PETG, ABS, TPU, SUNLU, ESUN, BAMBU, MATTE, etc.
-- Ejemplos: AMARILLO → `AMA1`, ROJO → `ROJ1`, segundo ROJO → `ROJ2`
-- SKU completo: `MON-AR-CIR1-AMA1`
+- `MON-AR-{MODELO}-{COLOR3LETRAS}` ejemplo: `MON-AR-CIR1-AMA1`
 
 ## Estados de Pedidos
 - `pendiente` → `visto` → `en_revision` → `en_produccion` → `listo` → `entregado`
-- Estados válidos en IPC y API REST
+- Solo se puede avanzar de `pendiente` a `visto` como primer paso
+- Cuando llega a `listo` aparece botón "📦 → Inventario" para agregar al inventario
 
-## Ticket de venta
-- Campos en config.json: `ticketDireccion`, `ticketTelefono`, `ticketRazonSocial`, `ticketRFC`, `ticketLeyenda`
-- IVA 16% solo si hay RFC configurado
-- Descuento en % por ticket (modificable)
-- Impresión via `window.open` + `window.print()`
-- Endpoint `/api/config` expone datos del ticket al celular
+## Funcionalidades recientes (Junio 2026)
+- ✅ Botón "＋ SKU" en cada card del catálogo — agrega directo al inventario
+- ✅ Inventario vista "Por modelo" agrupa por modelo y sub-agrupa por color
+- ✅ Hover en pestaña Imprimir muestra preview de imagen del modelo
+- ✅ Colores en grid de swatches (en lugar de lista)
+- ✅ Soporte colores degradados bi/tricolor en modal de color
+- ✅ Pedidos: botón "📦 → Inventario" cuando estado es "Listo"
+- ✅ Bug fix: agregar SKU suma pares al existente en lugar de reemplazar
+- ✅ Pedidos: solo puede avanzar de pendiente→visto como primer paso
 
-## Estado actual (Junio 2026)
-- ✅ SQLite funcionando, DB compartida con e500-app
-- ✅ Catálogo con toggle vista 3D / Foto, drag & drop de fotos
-- ✅ Inventario con totales, filtros, autocomplete con preview
-- ✅ SKU genera código corto (3 letras) sin marca ni tipo
-- ✅ Stock polling cada 10 segundos desde DB compartida
-- ✅ Sección Pedidos con estados, revisar, agrupar por color/placa
-- ✅ Agrupar pedidos divide en placas por pares totales (maxModelosPlaca)
-- ✅ Botón "Nuevo pedido (PC)" — venta inmediata, estado Listo
-- ✅ Sección Ventas con ticket, descuento %, IVA automático, impresión
-- ✅ Ventas descuentan inventario al cerrar ticket
-- ✅ Campos de ticket en Configuración (dirección, RFC, razón social, leyenda)
-- ✅ Cargar pedido terminado en ticket de venta
-- ✅ App móvil conectada via WiFi local
-
-## Pendiente para próxima sesión
-- Configurar `eas build:configure` en monsam-mobile para generar APK
-- El usuario ya tiene cuenta en expo.dev
-- Usar icono del repo de monsam-app para el APK
-- Agregar `eas.json` con perfil `preview` para APK de prueba
-
-## config.json (monsam)
+## config.json
 ```json
 {
   "marca": "MONSAM",
@@ -87,21 +61,11 @@
   "rutaAretes": "F:\\DISEÑOS\\Modelos 3D\\aretes",
   "rutaExcel": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
   "rutaDB": "F:\\DISEÑOS\\Modelos 3D\\control\\datos.db",
-  "costoKwh": 2.8,
-  "wattsPrinter": 350,
-  "costoHerrajes": 3.5,
-  "porcDesperdicio": 5,
-  "costoEmpaque": 2,
   "moonrakerIp": "192.168.68.113:7125",
-  "precioVentaPar": 0,
-  "ticketDireccion": "",
-  "ticketTelefono": "",
-  "ticketRazonSocial": "",
-  "ticketRFC": "",
-  "ticketLeyenda": ""
+  "precioVentaPar": 0
 }
 ```
 
 ## Ramas Git
-- Rama local: `main` ✅
-- Remote: `origin/main` ✅
+- Repo: `fdtn91/monsam-app`
+- Rama: `main`
