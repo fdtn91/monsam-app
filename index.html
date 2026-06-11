@@ -468,6 +468,20 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   .viewer-body{ grid-template-columns:1fr; }
   .viewer-sidebar{ display:none; }
 }
+/* ── COLORES GRID ── */
+.colores-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+.color-card{
+  background:var(--s1); border:1px solid var(--border); border-radius:10px;
+  overflow:hidden; cursor:default; transition:border-color .2s, transform .15s;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.color-card:hover{ border-color:rgba(21,81,36,.3); transform:translateY(-2px); }
+.color-card-swatch{ width:100%; height:64px; }
+.color-card-info{ padding:8px 10px 10px; }
+.color-card-nombre{ font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.color-card-codigo{ font-family:monospace; font-size:10px; color:var(--accent); margin-top:2px; }
+.color-card-stock{ font-size:10px; color:var(--muted); margin-top:2px; }
+.color-card-actions{ display:flex; gap:4px; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -839,13 +853,7 @@ tr:hover td{ background:rgba(21,81,36,.04); }
       </div>
       <div class="page-body">
         <div class="table-wrap">
-          <table id="tablaColores">
-            <thead><tr>
-              <th>Color</th><th>Nombre</th><th>Código</th>
-              <th>Descripción</th><th>Stock (gr)</th><th>Costo/kg</th><th></th>
-            </tr></thead>
-            <tbody id="bodyColores"><tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Cargando...</td></tr></tbody>
-          </table>
+          <div id="coloresWrapper"></div>
         </div>
       </div>
     </div>
@@ -1355,6 +1363,29 @@ tr:hover td{ background:rgba(21,81,36,.04); }
       <div class="field" style="grid-column:1/-1"><label>Nombre del color</label><input type="text" id="mColorNombre" placeholder="Rojo Carmín"/></div>
       <div class="field"><label>Color (hex)</label><input type="color" id="mColorHex" value="#F0A500" style="height:38px;padding:2px 6px;"/></div>
       <div class="field"><label>Código (auto si vacío)</label><input type="text" id="mColorCodigo" placeholder="ROJ1" maxlength="5"/></div>
+      <div class="field" style="grid-column:1/-1;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="mColorDegradado" onchange="toggleDegradado()" style="width:14px;height:14px;"/>
+          ¿Es color degradado (bicolor/tricolor)?
+        </label>
+      </div>
+      <div id="mColorDegradadoFields" style="display:none;grid-column:1/-1;">
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Color 2 (hex)</label>
+            <input type="color" id="mColorHex2" value="#FF0000" style="height:38px;padding:2px 6px;"/>
+          </div>
+          <div class="field"><label>Color 3 (hex, opcional)</label>
+            <input type="color" id="mColorHex3" value="#0000FF" style="height:38px;padding:2px 6px;"/>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;text-transform:none;">
+              <input type="checkbox" id="mColorUsarTres" style="width:12px;height:12px;"/> Incluir tercer color
+            </label>
+          </div>
+          <div class="field" style="grid-column:1/-1;">
+            <label>Vista previa degradado</label>
+            <div id="mColorDegradadoPreview" style="height:32px;border-radius:6px;border:1px solid var(--border);transition:background .2s;"></div>
+          </div>
+        </div>
+      </div>
       <div class="field" style="grid-column:1/-1"><label>Descripción</label><input type="text" id="mColorDesc" placeholder="PLA rojo oscuro"/></div>
       <div class="field"><label>Stock (gr)</label><input type="number" id="mColorStock" value="0"/></div>
       <div class="field"><label>Costo por kg ($)</label><input type="number" id="mColorCosto" step="0.01" value="0"/></div>
@@ -1597,6 +1628,53 @@ tr:hover td{ background:rgba(21,81,36,.04); }
   </div>
 </div>
 
+<!-- MODAL: AGREGAR SKU DESDE CATÁLOGO -->
+<div class="modal-backdrop" id="modalAgregarSku">
+  <div class="modal" style="width:420px;">
+    <div class="modal-title" id="mAgregarSkuTitle">Agregar SKU</div>
+    <input type="hidden" id="mAgregarSkuCodigo"/>
+    <input type="hidden" id="mAgregarSkuModelo"/>
+    <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+      <div class="field" style="grid-column:1/-1;">
+        <label>Color / filamento</label>
+        <select id="mAgregarSkuColor" onchange="genSkuAgregar()">
+          <option value="">-- selecciona color --</option>
+        </select>
+      </div>
+      <div class="field"><label>Pares a agregar</label>
+        <input type="number" id="mAgregarSkuPares" value="1" min="1"/>
+      </div>
+      <div class="field"><label>Costo producción/par ($)</label>
+        <input type="number" id="mAgregarSkuCosto" step="0.01" value="0"/>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <label>SKU generado</label>
+        <div id="mAgregarSkuPreview" style="font-family:monospace;font-size:13px;color:var(--accent);
+          background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;">—</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAgregarSku')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="guardarAgregarSKU()">✅ Agregar al inventario</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PEDIDO → INVENTARIO -->
+<div class="modal-backdrop" id="modalPedidoInv">
+  <div class="modal" style="width:560px;">
+    <div class="modal-title">Agregar pedido al inventario</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+      Asigna el color de filamento a cada modelo y confirma los pares producidos.
+    </div>
+    <div id="modalPedidoInvContenido" style="max-height:50vh;overflow-y:auto;margin-bottom:4px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalPedidoInv')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="confirmarPedidoAInventario()">📦 Confirmar y agregar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Three.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
@@ -1711,6 +1789,10 @@ function renderCatalogo () {
         <button class="catalogo-print-btn" id="printbtn-${item.codigo}"
           onclick="event.stopPropagation();togglePrintSelDesdecatalogo('${item.codigo}','${item.carpeta}','${item.archivo1}',this)">
           🖨 Imprimir
+        </button>
+        <button class="catalogo-print-btn" style="margin-top:4px;color:var(--ok);border-color:rgba(26,127,55,.3);"
+          onclick="event.stopPropagation();abrirModalAgregarSKU('${item.codigo}')">
+          ＋ SKU
         </button>
       </div>
     </div>`
@@ -2442,21 +2524,33 @@ async function loadColores () {
 }
 
 function renderColores () {
-  const tb = document.getElementById('bodyColores')
-  if (!colores.length) { tb.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sin colores registrados</td></tr>'; return }
-  tb.innerHTML = colores.map(c => `
-    <tr>
-      <td><span class="color-swatch" style="background:${c.hex||'#888'}"></span></td>
-      <td>${c.nombre}</td>
-      <td class="td-mono"><span class="badge badge-accent">${c.codigo}</span></td>
-      <td style="color:var(--text2)">${c.descripcion||'—'}</td>
-      <td class="td-mono">${c.stockGr||0} gr</td>
-      <td class="td-mono">$${(+c.costoPorKg||0).toFixed(2)}</td>
-      <td><div class="td-actions">
-        <button class="btn btn-secondary btn-sm" onclick="editColor('${c.nombre}')">Editar</button>
-        <button class="btn btn-danger btn-sm"    onclick="deleteColor('${c.nombre}')">Borrar</button>
-      </div></td>
-    </tr>`).join('')
+  // Cambiar a contenedor grid
+  const wrapper = document.getElementById('coloresWrapper')
+  if (!wrapper) return
+  if (!colores.length) {
+    wrapper.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;">Sin colores registrados</div>'
+    return
+  }
+  wrapper.innerHTML = `<div class="colores-grid">${colores.map(c => {
+    const swatchStyle = c.hex2
+      ? c.hex3
+        ? `background:linear-gradient(135deg,${c.hex} 33%,${c.hex2} 66%,${c.hex3} 100%)`
+        : `background:linear-gradient(135deg,${c.hex} 50%,${c.hex2} 50%)`
+      : `background:${c.hex||'#888'}`
+    return `
+    <div class="color-card">
+      <div class="color-card-swatch" style="${swatchStyle}"></div>
+      <div class="color-card-info">
+        <div class="color-card-nombre" title="${c.nombre}">${c.nombre}</div>
+        <div class="color-card-codigo"><span class="badge badge-accent">${c.codigo}</span></div>
+        <div class="color-card-stock">${c.stockGr||0} gr · $${(+c.costoPorKg||0).toFixed(0)}/kg</div>
+        <div class="color-card-actions">
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="editColor('${c.nombre}')">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteColor('${c.nombre}')">✕</button>
+        </div>
+      </div>
+    </div>`
+  }).join('')}</div>`
 }
 
 function openModalColor (nombre) {
@@ -2475,14 +2569,32 @@ function openModalColor (nombre) {
     document.getElementById('mColorStock').value = 0
     document.getElementById('mColorCosto').value = 0
   }
+  // Degradado
+  const isDeg = !!(nombre && colores.find(x => x.nombre === nombre)?.hex2)
+  document.getElementById('mColorDegradado').checked = isDeg
+  document.getElementById('mColorDegradadoFields').style.display = isDeg ? 'grid' : 'none'
+  if (isDeg && nombre) {
+    const c = colores.find(x => x.nombre === nombre)
+    document.getElementById('mColorHex2').value = c.hex2 || '#FF0000'
+    document.getElementById('mColorHex3').value = c.hex3 || '#0000FF'
+    document.getElementById('mColorUsarTres').checked = !!c.hex3
+  } else {
+    document.getElementById('mColorHex2').value = '#FF0000'
+    document.getElementById('mColorHex3').value = '#0000FF'
+    document.getElementById('mColorUsarTres').checked = false
+  }
+  actualizarPreviewDegradado()
   openModal('modalColor')
 }
 function editColor (n) { openModalColor(n) }
 
 async function saveColor () {
+  const isDeg = document.getElementById('mColorDegradado').checked
   const color = {
     nombre:      document.getElementById('mColorNombre').value.trim(),
     hex:         document.getElementById('mColorHex').value,
+    hex2:        isDeg ? document.getElementById('mColorHex2').value : null,
+    hex3:        isDeg && document.getElementById('mColorUsarTres').checked ? document.getElementById('mColorHex3').value : null,
     codigo:      document.getElementById('mColorCodigo').value.trim().toUpperCase() || null,
     descripcion: document.getElementById('mColorDesc').value.trim(),
     stockGr:     parseFloat(document.getElementById('mColorStock').value) || 0,
@@ -2567,20 +2679,67 @@ function renderInventario () {
     tb.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px">Sin registros</td></tr>'
     return
   }
-  tb.innerHTML = data.map(i => `
-    <tr>
-      <td class="td-sku">${i.sku}</td>
-      <td class="td-mono">${i.modelo}</td>
-      <td style="display:flex;align-items:center;gap:6px;">
-        <span class="color-swatch" style="background:${getHexColor(i.codigoColor)}"></span>${i.color}
-      </td>
-      <td><span class="badge ${i.pares > 0 ? 'badge-ok' : 'badge-error'}">${i.pares} pares</span></td>
-      <td class="td-mono">$${(+i.costoProduccion||0).toFixed(2)}</td>
-      <td><div class="td-actions">
-        <button class="btn btn-secondary btn-sm" onclick="openDescontar('${i.sku}')">Venta</button>
-        <button class="btn btn-danger btn-sm"    onclick="deleteInv('${i.sku}')">Borrar</button>
-      </div></td>
-    </tr>`).join('')
+
+  if (vista === 'modelo') {
+    // Agrupar por modelo exacto, luego sub-agrupar por color
+    const grupos = {}
+    data.forEach(i => {
+      if (!grupos[i.modelo]) grupos[i.modelo] = []
+      grupos[i.modelo].push(i)
+    })
+    let html = ''
+    Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([modelo, items]) => {
+      const totalPares = items.reduce((s,i) => s+(i.pares||0), 0)
+      html += `<tr style="background:var(--s2);">
+        <td colspan="6" style="padding:8px 13px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:monospace;font-weight:700;color:var(--accent);font-size:13px;">📦 ${modelo}</span>
+            <span style="font-size:11px;color:var(--muted);">${totalPares} pares · ${items.length} color${items.length!==1?'es':''}</span>
+          </div>
+        </td>
+      </tr>`
+      // Sub-agrupar por color dentro del modelo
+      const subGrupos = {}
+      items.forEach(i => {
+        const k = i.codigoColor || i.color
+        if (!subGrupos[k]) subGrupos[k] = []
+        subGrupos[k].push(i)
+      })
+      Object.values(subGrupos).forEach(subItems => {
+        subItems.forEach(i => {
+          html += `<tr>
+            <td class="td-sku" style="padding-left:26px;">${i.sku}</td>
+            <td class="td-mono" style="color:var(--muted);font-size:11px;">${i.modelo}</td>
+            <td style="display:flex;align-items:center;gap:6px;">
+              <span class="color-swatch" style="background:${getHexColor(i.codigoColor)}"></span>${i.color}
+            </td>
+            <td><span class="badge ${i.pares > 0 ? 'badge-ok' : 'badge-error'}">${i.pares} pares</span></td>
+            <td class="td-mono">$${(+i.costoProduccion||0).toFixed(2)}</td>
+            <td><div class="td-actions">
+              <button class="btn btn-secondary btn-sm" onclick="openDescontar('${i.sku}')">Venta</button>
+              <button class="btn btn-danger btn-sm"    onclick="deleteInv('${i.sku}')">Borrar</button>
+            </div></td>
+          </tr>`
+        })
+      })
+    })
+    tb.innerHTML = html
+  } else {
+    tb.innerHTML = data.map(i => `
+      <tr>
+        <td class="td-sku">${i.sku}</td>
+        <td class="td-mono">${i.modelo}</td>
+        <td style="display:flex;align-items:center;gap:6px;">
+          <span class="color-swatch" style="background:${getHexColor(i.codigoColor)}"></span>${i.color}
+        </td>
+        <td><span class="badge ${i.pares > 0 ? 'badge-ok' : 'badge-error'}">${i.pares} pares</span></td>
+        <td class="td-mono">$${(+i.costoProduccion||0).toFixed(2)}</td>
+        <td><div class="td-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openDescontar('${i.sku}')">Venta</button>
+          <button class="btn btn-danger btn-sm"    onclick="deleteInv('${i.sku}')">Borrar</button>
+        </div></td>
+      </tr>`).join('')
+  }
 
   // Totales por grupo al fondo
   const totalesEl = document.getElementById('invTotalesFila')
@@ -2699,13 +2858,15 @@ async function saveInv () {
   const modelo = document.getElementById('mInvModelo').value
   const codCol = document.getElementById('mInvColor').value
   if (!sku || !modelo || !codCol) { alert('Selecciona modelo y color.'); return }
-  const colorObj = colores.find(c => c.codigo === codCol)
+  const colorObj  = colores.find(c => c.codigo === codCol)
+  const existente = inventario.find(i => i.sku === sku)
+  const paresNuevos = parseInt(document.getElementById('mInvPares').value) || 0
   const item = {
     sku, modelo,
     color:           colorObj ? colorObj.nombre : codCol,
     codigoColor:     codCol,
-    pares:           parseInt(document.getElementById('mInvPares').value)   || 0,
-    costoProduccion: parseFloat(document.getElementById('mInvCosto').value) || 0
+    pares:           (existente ? existente.pares : 0) + paresNuevos,
+    costoProduccion: parseFloat(document.getElementById('mInvCosto').value) || (existente ? existente.costoProduccion : 0)
   }
   await api.saveInventario(cfg.rutaExcel, item)
   closeModal('modalInv')
@@ -3068,12 +3229,16 @@ function renderPrintGrid () {
   const grid = document.getElementById('printGrid')
   grid.innerHTML = items.map(item => {
     const sel = printSeleccion.find(s => s.codigo === item.codigo)
-    return `<div onclick="togglePrintSel('${item.codigo}','${item.carpeta}','${item.archivo1}')"
+    const fotoCache = window._fotoCache && window._fotoCache[item.codigo]
+    return `<div 
+      onclick="togglePrintSel('${item.codigo}','${item.carpeta}','${item.archivo1}')"
+      onmouseenter="mostrarPreviewPrint('${item.codigo}', event)"
+      onmouseleave="ocultarPreviewPrint()"
       style="
         background:${sel ? 'rgba(21,81,36,.1)' : 'var(--s2)'};
         border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
         border-radius:8px; padding:8px; cursor:pointer; text-align:center;
-        transition:all .15s; user-select:none;
+        transition:all .15s; user-select:none; position:relative;
       ">
       ${sel ? `<div style="color:var(--accent);font-size:10px;font-weight:700;margin-bottom:4px;">✓ En queue</div>` : ''}
       <div style="font-family:monospace;font-size:11px;font-weight:700;color:${sel?'var(--accent)':'var(--text)'};">
@@ -3370,6 +3535,7 @@ function showPage (id) {
 // ════════════════════════════════════════════════════════════
 let pedidosFiltroActual = 'todos'
 let pedidosData         = []
+let pedidoAInventarioId = null
 
 // ════════════════════════════════════════════════════════════
 //  PEDIDOS — REVISAR
@@ -4126,6 +4292,14 @@ function renderPedidos () {
          </button>`
       : ''
 
+    // Botón especial cuando está en "listo": agregar todo al inventario
+    const btnAgregarInv = p.estado === 'listo'
+      ? `<button class="btn btn-secondary btn-sm" style="color:var(--ok);border-color:rgba(26,127,55,.4);"
+           onclick="abrirModalPedidoAInventario(${p.id})">
+           📦 → Inventario
+         </button>`
+      : ''
+
     return `
     <div class="pedido-card estado-${p.estado}" id="pedido-${p.id}">
       <div class="pedido-header">
@@ -4139,6 +4313,7 @@ function renderPedidos () {
       <div class="pedido-items">${itemsHtml}</div>
       <div class="pedido-actions">
         ${nextBtn}
+        ${btnAgregarInv}
         ${est.next ? `<button class="btn btn-secondary btn-sm" onclick="cambiarEstado(${p.id})">Cambiar estado</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="revisarPedido(${p.id})">🔍 Revisar</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarPedido(${p.id})">🗑</button>
@@ -4195,6 +4370,192 @@ api.onPedidoNuevo(() => {
     loadPedidos()
   }
 })
+
+// ─── Agregar SKU desde Catálogo ───────────────────────────
+function abrirModalAgregarSKU (codigo) {
+  document.getElementById('mAgregarSkuCodigo').value   = codigo
+  document.getElementById('mAgregarSkuModelo').value   = codigo
+  document.getElementById('mAgregarSkuTitle').textContent = `Agregar SKU — ${codigo}`
+  document.getElementById('mAgregarSkuPares').value    = 1
+  document.getElementById('mAgregarSkuCosto').value    = 0
+  // Poblar select de colores
+  const sel = document.getElementById('mAgregarSkuColor')
+  sel.innerHTML = '<option value="">-- selecciona color --</option>'
+  colores.forEach(c => {
+    sel.innerHTML += `<option value="${c.codigo}">${c.nombre} (${c.codigo})</option>`
+  })
+  genSkuAgregar()
+  openModal('modalAgregarSku')
+}
+
+function genSkuAgregar () {
+  const modelo = document.getElementById('mAgregarSkuModelo').value
+  const codCol = document.getElementById('mAgregarSkuColor').value
+  if (!modelo || !codCol) { document.getElementById('mAgregarSkuPreview').textContent = '—'; return }
+  document.getElementById('mAgregarSkuPreview').textContent =
+    `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${modelo}-${codCol}`
+}
+
+async function guardarAgregarSKU () {
+  const modelo = document.getElementById('mAgregarSkuModelo').value
+  const codCol = document.getElementById('mAgregarSkuColor').value
+  if (!modelo || !codCol) { alert('Selecciona un color.'); return }
+  const sku      = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${modelo}-${codCol}`
+  const colorObj = colores.find(c => c.codigo === codCol)
+  const pares    = parseInt(document.getElementById('mAgregarSkuPares').value) || 1
+  const costo    = parseFloat(document.getElementById('mAgregarSkuCosto').value) || 0
+  const existente = inventario.find(i => i.sku === sku)
+  await api.saveInventario(cfg.rutaExcel, {
+    sku, modelo,
+    color:           colorObj ? colorObj.nombre : codCol,
+    codigoColor:     codCol,
+    pares:           (existente ? existente.pares : 0) + pares,
+    costoProduccion: costo || (existente ? existente.costoProduccion : 0)
+  })
+  closeModal('modalAgregarSku')
+  await loadInventario()
+  // Feedback visual en el botón
+  const btn = document.querySelector(`[onclick*="abrirModalAgregarSKU('${modelo}')"]`)
+  if (btn) { btn.textContent = '✓ SKU agregado'; setTimeout(() => btn.textContent = '＋ SKU', 2000) }
+}
+
+// ─── Preview hover en Imprimir ────────────────────────────
+let _previewHoverTimer = null
+
+async function mostrarPreviewPrint (codigo, event) {
+  _previewHoverTimer = setTimeout(async () => {
+    let tooltip = document.getElementById('printHoverTooltip')
+    if (!tooltip) {
+      tooltip = document.createElement('div')
+      tooltip.id = 'printHoverTooltip'
+      tooltip.style.cssText = `
+        position:fixed; z-index:9999; pointer-events:none;
+        background:var(--s1); border:1px solid var(--border);
+        border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15);
+        width:160px; height:160px; overflow:hidden;
+        display:flex; align-items:center; justify-content:center;
+        transition:opacity .15s;
+      `
+      document.body.appendChild(tooltip)
+    }
+    // Posicionar
+    const x = event.clientX + 16
+    const y = event.clientY - 80
+    tooltip.style.left = `${Math.min(x, window.innerWidth - 180)}px`
+    tooltip.style.top  = `${Math.max(y, 10)}px`
+    tooltip.style.opacity = '0'
+    tooltip.innerHTML = '<div class="stl-spinner" style="width:20px;height:20px;border-width:2px;"></div>'
+    tooltip.style.display = 'flex'
+    setTimeout(() => { if (tooltip) tooltip.style.opacity = '1' }, 10)
+
+    // Cargar foto o STL
+    const foto = await api.getFoto(cfg.rutaAretes, codigo)
+    if (foto) {
+      tooltip.innerHTML = `<img src="file:///${foto.replace(/\\/g,'/')}"
+        style="width:100%;height:100%;object-fit:cover;border-radius:10px;"/>`
+    } else {
+      const item = catalogoItems.find(i => i.codigo === codigo)
+      if (item) {
+        const stlB64 = await api.getStlBase64(cfg.rutaAretes, item.carpeta, item.archivo1)
+        if (stlB64) {
+          const img = renderSTLThumb(stlB64, 160, 160)
+          tooltip.innerHTML = ''
+          tooltip.appendChild(img)
+        } else {
+          tooltip.innerHTML = `<span style="font-size:10px;color:var(--muted)">Sin imagen</span>`
+        }
+      }
+    }
+  }, 300)
+}
+
+function ocultarPreviewPrint () {
+  if (_previewHoverTimer) { clearTimeout(_previewHoverTimer); _previewHoverTimer = null }
+  const tooltip = document.getElementById('printHoverTooltip')
+  if (tooltip) { tooltip.style.opacity = '0'; setTimeout(() => tooltip.style.display = 'none', 150) }
+}
+
+// ─── Degradados en modal de color ─────────────────────────
+function toggleDegradado () {
+  const check = document.getElementById('mColorDegradado').checked
+  document.getElementById('mColorDegradadoFields').style.display = check ? 'grid' : 'none'
+  actualizarPreviewDegradado()
+}
+
+function actualizarPreviewDegradado () {
+  const hex1 = document.getElementById('mColorHex').value
+  const hex2 = document.getElementById('mColorHex2').value
+  const usarTres = document.getElementById('mColorUsarTres')?.checked
+  const hex3 = usarTres ? document.getElementById('mColorHex3').value : null
+  const preview = document.getElementById('mColorDegradadoPreview')
+  if (!preview) return
+  if (!document.getElementById('mColorDegradado').checked) {
+    preview.style.background = hex1; return
+  }
+  preview.style.background = hex3
+    ? `linear-gradient(135deg,${hex1} 33%,${hex2} 66%,${hex3} 100%)`
+    : `linear-gradient(135deg,${hex1} 50%,${hex2} 50%)`
+}
+
+// ─── Pedido → Inventario ──────────────────────────────────
+async function abrirModalPedidoAInventario (id) {
+  const pedido = pedidosData.find(p => p.id === id)
+  if (!pedido) return
+
+  pedidoAInventarioId = id
+
+  const contenido = document.getElementById('modalPedidoInvContenido')
+  contenido.innerHTML = pedido.items.map((item, idx) => {
+    const colorOpts = colores.map(c =>
+      `<option value="${c.codigo}">${c.nombre} (${c.codigo})</option>`).join('')
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <span style="font-family:monospace;font-weight:700;color:var(--accent);min-width:80px;">${item.codigo}</span>
+      <select id="pedInvColor_${idx}" style="flex:1;background:var(--s1);border:1px solid var(--border);
+        border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);">
+        ${colorOpts}
+      </select>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <label style="font-size:11px;color:var(--muted);">Pares:</label>
+        <input type="number" id="pedInvPares_${idx}" value="${item.pares||1}" min="1"
+          style="width:60px;background:var(--s1);border:1px solid var(--border);border-radius:6px;
+          padding:5px 8px;font-size:12px;color:var(--text);"/>
+      </div>
+    </div>`
+  }).join('')
+
+  openModal('modalPedidoInv')
+}
+
+async function confirmarPedidoAInventario () {
+  const pedido = pedidosData.find(p => p.id === pedidoAInventarioId)
+  if (!pedido) return
+
+  for (let idx = 0; idx < pedido.items.length; idx++) {
+    const item   = pedido.items[idx]
+    const codCol = document.getElementById(`pedInvColor_${idx}`)?.value
+    const pares  = parseInt(document.getElementById(`pedInvPares_${idx}`)?.value) || item.pares || 1
+    if (!codCol) continue
+    const colorObj  = colores.find(c => c.codigo === codCol)
+    const sku       = `${cfg.prefijoSKU}-${cfg.tipoAccesorio}-${item.codigo}-${codCol}`
+    const existente = inventario.find(i => i.sku === sku)
+    await api.saveInventario(cfg.rutaExcel, {
+      sku,
+      modelo:          item.codigo,
+      color:           colorObj ? colorObj.nombre : codCol,
+      codigoColor:     codCol,
+      pares:           (existente ? existente.pares : 0) + pares,
+      costoProduccion: existente ? existente.costoProduccion : 0
+    })
+  }
+
+  // Avanzar estado a entregado
+  await api.setEstadoPedido(pedidoAInventarioId, 'entregado')
+  closeModal('modalPedidoInv')
+  await loadInventario()
+  await loadPedidos()
+  alert('✅ Pedido agregado al inventario y marcado como Entregado.')
+}
 </script>
 </body>
 </html>

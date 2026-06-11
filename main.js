@@ -793,7 +793,8 @@ ipcMain.handle('get-colores', () => {
     while (usedCodes.has(`${base}${n}`)) n++
     const codigo = `${base}${n}`
     usedCodes.add(codigo)
-    return { ...r, codigo }
+    const hexParts = (r.hex || '#888888').split('|')
+    return { ...r, codigo, hex: hexParts[0], hex2: hexParts[1]||null, hex3: hexParts[2]||null }
   })
 })
 
@@ -806,6 +807,7 @@ ipcMain.handle('save-color', (_, __, color) => {
     const existing = db.prepare("SELECT nombre FROM filamentos WHERE nombre LIKE ? || '%'").all(base)
     codigo = `${base}${existing.length + 1}`
   }
+  const hexFull = [color.hex, color.hex2, color.hex3].filter(Boolean).join('|')
   db.prepare(`
     INSERT INTO filamentos (nombre, costo_kg, stock_gr, color_hex, notas)
     VALUES (?,?,?,?,?)
@@ -813,7 +815,7 @@ ipcMain.handle('save-color', (_, __, color) => {
       costo_kg=excluded.costo_kg, stock_gr=excluded.stock_gr,
       color_hex=excluded.color_hex, notas=excluded.notas,
       updated_at=datetime('now','localtime')
-  `).run(nombre, color.costoPorKg||0, color.stockGr||0, color.hex||'#888888', color.descripcion||'')
+  `).run(nombre, color.costoPorKg||0, color.stockGr||0, hexFull||'#888888', color.descripcion||'')
   return codigo
 })
 
