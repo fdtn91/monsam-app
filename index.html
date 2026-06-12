@@ -3320,21 +3320,26 @@ function limpiarSeleccion () {
 }
 
 function renderPrintQueue () {
-  const count = document.getElementById('printSelCount')
-  const queue = document.getElementById('printQueue')
-  count.textContent = `${printSeleccion.length} seleccionado${printSeleccion.length !== 1 ? 's' : ''}`
+  const globalPares = parseInt(document.getElementById('printPares').value) || 1
+  const countText   = `${printSeleccion.length} seleccionado${printSeleccion.length !== 1 ? 's' : ''}`
 
-  if (!printSeleccion.length) {
-    queue.innerHTML = '<span style="color:var(--muted)">Ningún modelo seleccionado</span>'
-    return
-  }
-  const pares = parseInt(document.getElementById('printPares').value) || 1
-  queue.innerHTML = printSeleccion.map(s => `
-    <div style="display:flex;align-items:center;justify-content:space-between;
-      padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
-      <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.codigo}</span>
-      <span style="color:var(--text2)">${pares} par${pares>1?'es':''} × 2 = ${pares*2} piezas</span>
-    </div>`).join('')
+  // Actualizar TODOS los contadores (hay dos elementos con mismo id)
+  document.querySelectorAll('#printSelCount').forEach(el => el.textContent = countText)
+
+  const html = !printSeleccion.length
+    ? '<span style="color:var(--muted)">Ningún modelo seleccionado</span>'
+    : printSeleccion.map(s => {
+        const pares = s.pares || globalPares   // usar pares del pedido si existen
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${s.codigo}</span>
+          <span style="color:var(--text2)">${pares} par${pares>1?'es':''} × 2 = ${pares*2} piezas</span>
+        </div>`
+      }).join('')
+
+  // Actualizar TODOS los printQueue (hay dos elementos con mismo id)
+  document.querySelectorAll('#printQueue').forEach(el => el.innerHTML = html)
 }
 
 // Cuando cambia cantidad de pares actualizar la cola
@@ -3376,7 +3381,8 @@ async function iniciarImpresion () {
     btn.textContent = '② Abriendo OrcaSlicer...'
     const stlPaths = []
     for (const item of printSeleccion) {
-      for (let p = 0; p < pares; p++) {
+      const itemPares = item.pares || pares   // usar pares del pedido si existen
+      for (let p = 0; p < itemPares; p++) {
         // Agregar ambas piezas del par (_1 y _2)
         const arch1 = item.archivo1
         const arch2 = arch1.replace('_1.stl', '_2.stl')
@@ -3759,7 +3765,7 @@ async function agregarPlacaAlQueue (grupoIdx, placaIdx) {
     const item = catalogoItems.find(i => i.codigo === modelo.codigo)
     if (!item) continue
     if (printSeleccion.find(s => s.codigo === modelo.codigo)) continue
-    printSeleccion.push({ codigo: modelo.codigo, carpeta: item.carpeta, archivo1: item.archivo1 })
+    printSeleccion.push({ codigo: modelo.codigo, carpeta: item.carpeta, archivo1: item.archivo1, pares: modelo.pares })
     agregados++
   }
 
