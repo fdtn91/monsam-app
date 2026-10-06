@@ -7,10 +7,15 @@
   "rutaExcelMonsan": "F:\\DISEÑOS\\Modelos 3D\\aretes\\Catalogo_Aretes_3D.xlsx",
   "rutaDB": "F:\\DISEÑOS\\Modelos 3D\\control\\datos.db",
   "rutaGcodes": "F:\\DISEÑOS\\Modelos 3D\\aretes\\gcode",
-  "costoKwh": 2.8,
+  "costoKwh": 3.2,
   "wattsPrinter": 350,
-  "costoHerrajes": 3.5,
+  "costoHerrajes": 0.28,
   "porcDesperdicio": 5,
-  "costoEmpaque": 2,
-  "version": "1.0.0"
+  "costoEmpaque": 0.24,
+  "version": "1.0.0",
+  "orcaSlicerPath": "C:\\Program Files\\OrcaSlicer\\orca-slicer.exe",
+  "moonrakerIp": "192.168.68.113:7125",
+  "zOffset": 0.19,
+  "maxModelosPlaca": 7,
+  "precioVentaPar": 35
 }
